@@ -1,0 +1,5 @@
+export const STUDENT_INSTITUTION_CODE =
+  "SINGLA123";
+
+export const TEACHER_ACCESS_CODE =
+  "TEACHER2026";
