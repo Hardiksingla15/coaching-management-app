@@ -3,6 +3,11 @@ import {
     doc,
     setDoc,
     getDoc,
+    collection,
+    query,
+    where,
+    getDocs,
+    updateDoc,
   } from "firebase/firestore";
   
   import { app } from "./config";
@@ -31,12 +36,7 @@ import {
     return snapshot.data();
   };
 
-  import {
-    collection,
-    query,
-    where,
-    getDocs,
-  } from "firebase/firestore";
+
 
   export const getUserByMobile = async (
     mobile: string
@@ -55,3 +55,36 @@ import {
   
     return querySnapshot.docs[0].data();
   };
+
+  export const getAllStudents =
+  async () => {
+
+    const q = query(
+      collection(db, "users"),
+      where("role", "==", "student")
+    );
+
+    const snapshot =
+      await getDocs(q);
+
+    return snapshot.docs.map(
+      (doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })
+    );
+};
+export const updateStudentData =
+  async (
+    id: string,
+    data: any
+  ) => {
+
+    const userRef =
+      doc(db, "users", id);
+
+    await updateDoc(
+      userRef,
+      data
+    );
+};

@@ -16,18 +16,12 @@ import { loginUser } from "../../firebase/auth";
 
 import { getUserByMobile } from "../../firebase/firestore";
 
-import {
-  STUDENT_INSTITUTION_CODE,
-  TEACHER_ACCESS_CODE,
-} from "../../constants/appConstants";
 
 export default function LoginScreen() {
 
   const router = useRouter();
 
-  const [accessCode, setAccessCode] =
-    useState("");
-
+ 
   const [mobile, setMobile] =
     useState("");
 
@@ -40,7 +34,7 @@ export default function LoginScreen() {
   const handleLogin = async () => {
 
     if (
-      !accessCode ||
+      
       !mobile ||
       !password
     ) {
@@ -78,52 +72,22 @@ export default function LoginScreen() {
 
       // STUDENT LOGIN
       if (userData.role === "student") {
-
-        if (
-          accessCode !==
-          STUDENT_INSTITUTION_CODE
-        ) {
-
-          Alert.alert(
-            "Error",
-            "Invalid institution code"
-          );
-
-          return;
-        }
-
         Alert.alert(
           "Success",
           "Student Login Successful 🚀"
         );
-
+      
         router.push(
           "/(student)/dashboard"
         );
-
-      }
-
-      // TEACHER LOGIN
-      else {
-
-        if (
-          accessCode !==
-          TEACHER_ACCESS_CODE
-        ) {
-
-          Alert.alert(
-            "Error",
-            "Invalid teacher access code"
-          );
-
-          return;
-        }
-
+      
+      } else {
+      
         Alert.alert(
           "Success",
           "Teacher Login Successful 🚀"
         );
-
+      
         router.push(
           "/(teacher)/dashboard"
         );
@@ -163,11 +127,7 @@ export default function LoginScreen() {
         subtitle="Login to continue"
       />
 
-      <CustomInput
-        placeholder="Access Code"
-        value={accessCode}
-        onChangeText={setAccessCode}
-      />
+      
 
       <CustomInput
         placeholder="Mobile Number"

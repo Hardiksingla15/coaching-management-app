@@ -136,18 +136,24 @@ export default function SignupScreen() {
       const uid =
         userCredential.user.uid;
 
-      await saveUserData(uid, {
+        await saveUserData(uid, {
 
-        name,
-        mobile,
-        role,
-
-        institutionCode:
-          role === "student"
-            ? institutionCode
-            : null,
-      });
-
+          name,
+          mobile,
+          role,
+        
+          institutionCode:
+            role === "student"
+              ? institutionCode
+              : null,
+        
+          classLevel: "",
+        
+          batch: "",
+        
+          subjects: [],
+        });
+        
       Alert.alert(
         "Success",
         "Account Created 🚀"
