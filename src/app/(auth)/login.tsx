@@ -1,133 +1,69 @@
 import { Link, useRouter } from "expo-router";
 import { useState } from "react";
-
-import {
-  Text,
-  TouchableOpacity,
-  Alert,
-} from "react-native";
+import { Text, TouchableOpacity, Alert } from "react-native";
 
 import AuthHeader from "../../components/AuthHeader";
 import ScreenContainer from "../../components/ScreenContainer";
 import CustomInput from "../../components/CustomInput";
 import AuthButton from "../../components/AuthButton";
-
 import { loginUser } from "../../firebase/auth";
-
 import { getUserByMobile } from "../../firebase/firestore";
-
+import { getDashboardPath } from "../../services/roleRouting";
 
 export default function LoginScreen() {
-
   const router = useRouter();
 
- 
-  const [mobile, setMobile] =
-    useState("");
-
-  const [password, setPassword] =
-    useState("");
-
-  const [loading, setLoading] =
-    useState(false);
+  const [mobile, setMobile] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
-
-    if (
-      
-      !mobile ||
-      !password
-    ) {
-      Alert.alert(
-        "Error",
-        "Please fill all fields"
-      );
-
+    if (!mobile || !password) {
+      Alert.alert("Error", "Please fill all fields");
       return;
     }
 
     try {
-
       setLoading(true);
 
-      // CHECK USER EXISTS
-      const userData =
-        await getUserByMobile(mobile);
+      const userData = await getUserByMobile(mobile);
 
       if (!userData) {
-
-        Alert.alert(
-          "Error",
-          "Account not found"
-        );
-
+        Alert.alert("Error", "Account not found");
         return;
       }
 
-      // LOGIN AUTH
-      await loginUser(
-        mobile,
-        password
-      );
+      await loginUser(mobile, password);
 
-      // STUDENT LOGIN
-      if (userData.role === "student") {
-        Alert.alert(
-          "Success",
-          "Student Login Successful 🚀"
-        );
-      
-        router.push(
-          "/(student)/dashboard"
-        );
-      
-      } else {
-      
-        Alert.alert(
-          "Success",
-          "Teacher Login Successful 🚀"
-        );
-      
-        router.push(
-          "/(teacher)/dashboard"
-        );
-      }
+      const roleLabel =
+        userData.role === "owner"
+          ? "Owner"
+          : userData.role === "teacher"
+            ? "Teacher"
+            : "Student";
 
-    } catch (error: any) {
+      Alert.alert("Success", `${roleLabel} login successful`);
 
-      let errorMessage =
-        "Something went wrong";
+      router.replace(getDashboardPath(userData.role) as never);
+    } catch (error: unknown) {
+      let errorMessage = "Something went wrong";
 
       if (
-        error.message.includes(
-          "auth/invalid-credential"
-        )
+        error instanceof Error &&
+        error.message.includes("auth/invalid-credential")
       ) {
-
-        errorMessage =
-          "Wrong mobile or password";
+        errorMessage = "Wrong mobile or password";
       }
 
-      Alert.alert(
-        "Login Error",
-        errorMessage
-      );
-
+      Alert.alert("Login Error", errorMessage);
     } finally {
-
       setLoading(false);
     }
   };
 
   return (
     <ScreenContainer>
-
-      <AuthHeader
-        title="Welcome Back 👋"
-        subtitle="Login to continue"
-      />
-
-      
+      <AuthHeader title="Welcome Back 👋" subtitle="Login to continue" />
 
       <CustomInput
         placeholder="Mobile Number"
@@ -144,23 +80,17 @@ export default function LoginScreen() {
       />
 
       <AuthButton
-        title={
-          loading
-            ? "Logging in..."
-            : "Login"
-        }
+        title={loading ? "Logging in..." : "Login"}
         onPress={handleLogin}
       />
 
       <Link href="/(auth)/signup" asChild>
-
         <TouchableOpacity
           style={{
             marginTop: 20,
             alignItems: "center",
           }}
         >
-
           <Text
             style={{
               color: "blue",
@@ -169,11 +99,8 @@ export default function LoginScreen() {
           >
             Create New Account
           </Text>
-
         </TouchableOpacity>
-
       </Link>
-
     </ScreenContainer>
   );
 }

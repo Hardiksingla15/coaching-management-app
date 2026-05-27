@@ -3,7 +3,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 import BatchContextWrapper from "../../components/batch/BatchContextWrapper";
 
-export default function StudentLayout() {
+export default function OwnerLayout() {
   return (
     <BatchContextWrapper>
       <Tabs
@@ -23,50 +23,38 @@ export default function StudentLayout() {
         />
 
         <Tabs.Screen
-          name="notes"
+          name="students"
           options={{
-            title: "Notes",
+            title: "Students",
             tabBarIcon: ({ color, size }) => (
-              <Ionicons name="document-text" size={size} color={color} />
+              <Ionicons name="school" size={size} color={color} />
             ),
           }}
         />
 
         <Tabs.Screen
-          name="notifications"
+          name="teachers"
           options={{
-            title: "Alerts",
+            title: "Teachers",
             tabBarIcon: ({ color, size }) => (
-              <Ionicons name="notifications" size={size} color={color} />
+              <Ionicons name="people" size={size} color={color} />
             ),
           }}
         />
 
         <Tabs.Screen
-          name="doubts"
-          options={{
-            title: "Doubts",
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="help-circle" size={size} color={color} />
-            ),
-          }}
+          name="manage-batches"
+          options={{ href: null }}
         />
 
         <Tabs.Screen
-          name="fees"
-          options={{
-            title: "Fees",
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="cash" size={size} color={color} />
-            ),
-          }}
+          name="manage-student"
+          options={{ href: null }}
         />
 
         <Tabs.Screen
-          name="attendance"
-          options={{
-            href: null,
-          }}
+          name="manage-teacher"
+          options={{ href: null }}
         />
       </Tabs>
     </BatchContextWrapper>

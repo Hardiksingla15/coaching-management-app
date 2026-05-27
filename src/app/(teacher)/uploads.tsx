@@ -1,116 +1,82 @@
 import { useState } from "react";
+import { Alert, Text } from "react-native";
 
-import {
-  View,
-  Text,
-  Alert,
-} from "react-native";
-
-import CustomInput
-  from "../../components/CustomInput";
-
-import AuthButton
-  from "../../components/AuthButton";
-
-import ScreenContainer
-  from "../../components/ScreenContainer";
-
-import { addNote }
-  from "../../firebase/notes";
+import CustomInput from "../../components/CustomInput";
+import AuthButton from "../../components/AuthButton";
+import ScreenContainer from "../../components/ScreenContainer";
+import ContextHeader from "../../components/batch/ContextHeader";
+import EmptyState from "../../components/batch/EmptyState";
+import { useBatchContext } from "../../context/BatchContext";
+import { addNote } from "../../firebase/notes";
 
 export default function TeacherNotes() {
+  const { activeBatch } = useBatchContext();
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [subject, setSubject] = useState("");
 
-  const [title, setTitle] =
-    useState("");
+  const handleAddNote = async () => {
+    if (!activeBatch) {
+      Alert.alert("Error", "Select a teaching batch on the dashboard");
+      return;
+    }
 
-  const [description,
-    setDescription] =
-    useState("");
+    if (!title || !description) {
+      Alert.alert("Error", "Please fill title and description");
+      return;
+    }
 
-  const [batch, setBatch] =
-    useState("");
+    try {
+      await addNote({
+        title,
+        description,
+        classLevel: activeBatch.classLevel,
+        batch: activeBatch.batch,
+        subject: subject || activeBatch.subjects[0] || "",
+      });
 
-  const handleAddNote =
-    async () => {
-
-      if (
-        !title ||
-        !description ||
-        !batch
-      ) {
-
-        Alert.alert(
-          "Error",
-          "Please fill all fields"
-        );
-
-        return;
-      }
-
-      try {
-
-        await addNote({
-          title,
-          description,
-          batch,
-        });
-
-        Alert.alert(
-          "Success",
-          "Note Added 🚀"
-        );
-
-        setTitle("");
-        setDescription("");
-        setBatch("");
-
-      } catch {
-
-        Alert.alert(
-          "Error",
-          "Failed to add note"
-        );
-      }
-    };
+      Alert.alert("Success", "Note Added 🚀");
+      setTitle("");
+      setDescription("");
+      setSubject("");
+    } catch {
+      Alert.alert("Error", "Failed to add note");
+    }
+  };
 
   return (
     <ScreenContainer>
-
-      <Text
-        style={{
-          fontSize: 28,
-          fontWeight: "bold",
-          marginBottom: 20,
-        }}
-      >
+      <Text style={{ fontSize: 28, fontWeight: "bold", marginBottom: 12 }}>
         Add Notes 📚
       </Text>
 
-      <CustomInput
-        placeholder="Title"
-        value={title}
-        onChangeText={setTitle}
-      />
+      <ContextHeader activeBatch={activeBatch} />
 
-      <CustomInput
-        placeholder="Description"
-        value={description}
-        onChangeText={
-          setDescription
-        }
-      />
+      {!activeBatch ? (
+        <EmptyState message="Select an assigned batch on your dashboard first." />
+      ) : (
+        <>
+          <CustomInput
+            placeholder="Title"
+            value={title}
+            onChangeText={setTitle}
+          />
 
-      <CustomInput
-        placeholder="Batch"
-        value={batch}
-        onChangeText={setBatch}
-      />
+          <CustomInput
+            placeholder="Description"
+            value={description}
+            onChangeText={setDescription}
+          />
 
-      <AuthButton
-        title="Add Note"
-        onPress={handleAddNote}
-      />
+          <CustomInput
+            placeholder={`Subject (e.g. ${activeBatch.subjects.join(", ") || "Physics"})`}
+            value={subject}
+            onChangeText={setSubject}
+          />
 
+          <AuthButton title="Add Note" onPress={handleAddNote} />
+        </>
+      )}
     </ScreenContainer>
   );
 }

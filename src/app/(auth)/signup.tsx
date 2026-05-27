@@ -16,6 +16,8 @@ import AuthButton from "../../components/AuthButton";
 import { signupUser } from "../../firebase/auth";
 
 import { saveUserData } from "../../firebase/firestore";
+import { getDashboardPath } from "../../services/roleRouting";
+import type { UserRole } from "../../types/user";
 
 import {
   STUDENT_INSTITUTION_CODE,
@@ -137,21 +139,13 @@ export default function SignupScreen() {
         userCredential.user.uid;
 
         await saveUserData(uid, {
-
           name,
           mobile,
-          role,
-        
+          role: role as UserRole,
           institutionCode:
-            role === "student"
-              ? institutionCode
-              : null,
-        
-          classLevel: "",
-        
-          batch: "",
-        
-          subjects: [],
+            role === "student" ? institutionCode : null,
+          assignedBatches: [],
+          createdAt: Date.now(),
         });
         
       Alert.alert(
@@ -159,18 +153,7 @@ export default function SignupScreen() {
         "Account Created 🚀"
       );
 
-      if (role === "student") {
-
-        router.push(
-          "/(student)/dashboard"
-        );
-
-      } else {
-
-        router.push(
-          "/(teacher)/dashboard"
-        );
-      }
+      router.replace(getDashboardPath(role) as never);
 
     } catch (error: any) {
 

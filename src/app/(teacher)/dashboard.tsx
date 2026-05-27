@@ -1,46 +1,38 @@
-import AppHeader from "../../components/AppHeader";
-import { View, Text } from "react-native";
-import { useRouter } from "expo-router";
+import { ScrollView } from "react-native";
 
-import DashboardCard from "../../components/DashboardCard";
+import AppHeader from "../../components/AppHeader";
+import ScreenContainer from "../../components/ScreenContainer";
+import BatchSelector from "../../components/batch/BatchSelector";
+import ContextHeader from "../../components/batch/ContextHeader";
+import DashboardSection from "../../components/batch/DashboardSection";
+import BatchAwareQuickActions from "../../components/dashboard/BatchAwareQuickActions";
+import { useBatchContext } from "../../context/BatchContext";
 
 export default function TeacherDashboard() {
-
-  const router = useRouter();
+  const { batches, activeBatch, setActiveBatch } = useBatchContext();
 
   return (
-    <View
-      style={{
-        flex: 1,
-        padding: 20,
-        backgroundColor: "#fff",
-      }}
-    >
-      <AppHeader title="Teacher Dashboard 👨‍🏫" />
+    <ScreenContainer>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <AppHeader title="Teacher Dashboard 👨‍🏫" />
 
-      <DashboardCard
-        title="Announcements"
-        icon="megaphone"
-        onPress={() => router.push("/(teacher)/announcements")}
-      />
+        <BatchSelector
+          title="Assigned Teaching Batches"
+          batches={batches}
+          selectedBatch={activeBatch}
+          onSelect={setActiveBatch}
+          emptyMessage="No teaching batches assigned yet."
+        />
 
-      <DashboardCard
-        title="Students"
-        icon="people"
-        onPress={() => router.push("/(teacher)/students")}
-      />
+        <ContextHeader
+          activeBatch={activeBatch}
+          subtitle="Quick actions apply to the selected batch"
+        />
 
-      <DashboardCard
-        title="Upload Notes"
-        icon="cloud-upload"
-        onPress={() => router.push("/(teacher)/uploads")}
-      />
-
-      <DashboardCard
-        title="Doubts"
-        icon="chatbubble-ellipses"
-        onPress={() => router.push("/(teacher)/doubts")}
-      />
-    </View>
+        <DashboardSection title="Quick Actions">
+          <BatchAwareQuickActions />
+        </DashboardSection>
+      </ScrollView>
+    </ScreenContainer>
   );
 }

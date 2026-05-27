@@ -1,40 +1,35 @@
-import ScreenContainer from "../../components/ScreenContainer";
-import { View, Text } from "react-native";
-import { useRouter } from "expo-router";
+import { ScrollView } from "react-native";
+
 import AppHeader from "../../components/AppHeader";
-import DashboardCard from "../../components/DashboardCard";
+import ScreenContainer from "../../components/ScreenContainer";
+import BatchSelector from "../../components/batch/BatchSelector";
+import ContextHeader from "../../components/batch/ContextHeader";
+import StudentModuleCards from "../../components/dashboard/StudentModuleCards";
+import { useBatchContext } from "../../context/BatchContext";
 
 export default function StudentDashboard() {
-
-  const router = useRouter();
+  const { batches, activeBatch, setActiveBatch } = useBatchContext();
 
   return (
     <ScreenContainer>
-      <AppHeader title="Student Dashboard 🎓" />
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <AppHeader title="Student Dashboard 🎓" />
 
-      <DashboardCard
-        title="Notes"
-        icon="document-text"
-        onPress={() => router.push("/(student)/notes")}
-      />
+        <BatchSelector
+          title="Your Batches"
+          batches={batches}
+          selectedBatch={activeBatch}
+          onSelect={setActiveBatch}
+          emptyMessage="No batches assigned. Contact your institute."
+        />
 
-      <DashboardCard
-        title="Notifications"
-        icon="notifications"
-        onPress={() => router.push("/(student)/notifications")}
-      />
+        <ContextHeader
+          activeBatch={activeBatch}
+          subtitle="Modules below use this batch context"
+        />
 
-      <DashboardCard
-        title="Doubts"
-        icon="help-circle"
-        onPress={() => router.push("/(student)/doubts")}
-      />
-
-      <DashboardCard
-        title="Fees"
-        icon="cash"
-        onPress={() => router.push("/(student)/fees")}
-      />
+        <StudentModuleCards />
+      </ScrollView>
     </ScreenContainer>
   );
 }

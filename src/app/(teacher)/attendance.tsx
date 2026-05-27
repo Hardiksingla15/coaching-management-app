@@ -5,16 +5,16 @@ import ContextHeader from "../../components/batch/ContextHeader";
 import EmptyState from "../../components/batch/EmptyState";
 import { useBatchContext } from "../../context/BatchContext";
 
-export default function AnnouncementsScreen() {
+export default function TeacherAttendanceScreen() {
   const { activeBatch } = useBatchContext();
 
   return (
     <ScreenContainer>
       <Text style={{ fontSize: 28, fontWeight: "bold", marginBottom: 12 }}>
-        Announcements
+        Attendance
       </Text>
       <ContextHeader activeBatch={activeBatch} />
-      <EmptyState message="Send announcements to the active batch in the next phase." />
+      <EmptyState message="Mark attendance for the active batch in the next phase." />
     </ScreenContainer>
   );
 }

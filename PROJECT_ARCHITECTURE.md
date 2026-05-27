@@ -110,24 +110,27 @@ Restrictions:
 
 ## users
 
-Fields:
+Primary batch model (single source of truth):
 
 {
   name,
   mobile,
   role,
-
   institutionCode,
-
-  assignedBatches: [],
-
-  classLevel,
-  batch,
-
-  subjects: [],
-
+  assignedBatches: [
+    {
+      classLevel: "11",
+      batch: "Morning",
+      subjects: ["Physics", "Chemistry"]
+    }
+  ],
   createdAt
 }
+
+Notes:
+- `assignedBatches` is used for owner, teacher, and student.
+- Legacy `classLevel`, `batch`, `subjects` fields may exist in old documents and are migrated into `assignedBatches` on read.
+- A user may have multiple batch assignments.
 
 --------------------------------------------------
 
@@ -302,7 +305,25 @@ status values:
 
 --------------------------------------------------
 
-# 5. DASHBOARD UX ARCHITECTURE
+# 5. BATCH CONTEXT ARCHITECTURE
+
+Core principle:
+- One dynamic dashboard per role (not separate dashboards per batch).
+- User selects an active batch card → session context updates.
+- All modules filter using the active batch context.
+
+Implementation:
+- `BatchContextProvider` stores `activeBatch` for the session.
+- `BatchSelector` + `BatchCard` for selectable batch UI.
+- `batchFiltering.ts` filters notes, announcements, attendance, doubts, fees.
+- `batchUtils.ts` normalizes and deduplicates `assignedBatches`.
+
+Legacy migration:
+- If `assignedBatches` is empty but legacy `classLevel` + `batch` exist, they are merged on read.
+
+--------------------------------------------------
+
+# 6. DASHBOARD UX ARCHITECTURE
 
 IMPORTANT:
 Dashboard UX should minimize confusion between:
@@ -311,8 +332,8 @@ Dashboard UX should minimize confusion between:
 - subjects
 
 The app should always make users understand:
-1. current batch
-2. current subject
+1. active batch context
+2. current subject scope (within batch)
 3. current notifications
 4. current resources
 
@@ -320,127 +341,38 @@ without deep navigation confusion.
 
 --------------------------------------------------
 
-# 6. OWNER DASHBOARD UX
+# 7. OWNER DASHBOARD UX
 
-Top Section:
-- institute overview cards
+Section 1 — Institute management:
+- overview cards (students, teachers, pending fees)
+- manage academic structure
+- manage students (create/edit/delete, multi-batch assignment)
+- manage teachers (create/edit/delete, multi-batch assignment)
 
-Cards:
-- total students
-- total teachers
-- total pending fees
-- today attendance
-
---------------------------------------------------
-
-Middle Section:
-Quick Actions Grid
-
-Actions:
-- manage students
-- manage teachers
-- assign teachers
-- manage batches
-- upload notes
-- announcements
-- attendance
-- fees
+Section 2 — Personal teaching (reuses teacher workflow):
+- selectable assigned teaching batches
+- batch-context quick actions (notes, attendance, announcements, doubts)
+- owner uses the same teacher screens for teaching tools
 
 --------------------------------------------------
 
-Bottom Section:
-Recent Activity Feed
+# 8. TEACHER DASHBOARD UX
 
-Includes:
-- recent uploads
-- attendance updates
-- fee updates
-- announcements
+1. Selectable assigned batch cards (only assigned batches visible)
+2. Active batch context header
+3. Quick actions apply ONLY to active batch
+4. Teacher cannot access unrelated batches
 
 --------------------------------------------------
 
-# 7. TEACHER DASHBOARD UX
+# 9. STUDENT DASHBOARD UX
 
-Top:
-Assigned Batch Cards
+1. "Your Batches" — horizontal selectable batch cards
+2. Active batch context header
+3. One dashboard; modules unlock after batch selection
+4. Filtered modules: notes, attendance, fees, announcements, doubts
 
-Example:
-- 11 Morning
-- 12 Evening
-
-Teacher first selects batch.
-
-This avoids confusion.
-
---------------------------------------------------
-
-After Batch Selection:
-Dashboard switches context to selected batch.
-
-Then shows:
-- notes
-- attendance
-- announcements
-- doubts
-
-ONLY for selected batch.
-
---------------------------------------------------
-
-Quick Actions:
-- upload note
-- mark attendance
-- send announcement
-- answer doubts
-
---------------------------------------------------
-
-# 8. STUDENT DASHBOARD UX
-
-IMPORTANT:
-Student UX should prioritize:
-- clarity
-- low confusion
-- quick access
-
---------------------------------------------------
-
-Top Section:
-Current Batch Card
-
-Example:
-- Class 11
-- Morning Batch
-- Physics/Chemistry
-
-Student always sees:
-current assigned batch context.
-
---------------------------------------------------
-
-Middle Section:
-Important Notification Card
-
-Global notifications shown separately.
-
-Includes:
-- urgent notices
-- fee reminders
-- exam notices
-
---------------------------------------------------
-
-Main Dashboard Sections:
-
-1. Notes Card
-2. Attendance Card
-3. Fees Card
-4. Doubts Card
-
-Each card clearly shows:
-- subject
-- batch label
-- latest updates
+Student must select a batch before module screens show batch-filtered data.
 
 --------------------------------------------------
 
@@ -484,58 +416,43 @@ Simple percentages.
 
 --------------------------------------------------
 
-# 9. MANAGE STUDENTS FEATURE
+# 10. MANAGE STUDENTS FEATURE
 
 Owner only.
 
 Features:
-- create
-- edit
-- update
-- delete
-- assign batch
-- assign subjects
-- assign teacher mapping
+- create / edit / delete student
+- multi-batch assignment UX (`MultiBatchAssignment`)
+- multiple subjects per batch
+- remove individual batch assignments
 
-Student cards should show:
-- name
-- class
-- batch
-- subjects
-- fee status
-
-Search + filter required.
+Uses `assignedBatches[]` as stored model.
 
 --------------------------------------------------
 
-# 10. MANAGE TEACHERS FEATURE
+# 11. MANAGE TEACHERS FEATURE
 
 Owner only.
 
 Features:
-- create
-- edit
-- delete
-- assign batches
-- assign subjects
+- create / edit / delete teacher
+- assign multiple teaching batches
+- assign multiple subjects per batch
+- remove batch assignments
 
-Teacher cards should show:
-- assigned batches
-- assigned subjects
+Teacher list shows all assigned batches per teacher.
 
 --------------------------------------------------
 
-# 11. ASSIGN TEACHERS SYSTEM
+# 12. MULTI-BATCH ANNOUNCEMENTS (planned)
 
-Owner selects:
-- class
-- batch
-- subject
+Announcements support:
+- single batch
+- multi-batch (`multiBatches`)
+- class-wide / institute-wide targets
 
-Then:
-assign teacher.
-
-Teacher only sees assigned data after login.
+Teachers: only assigned batches.
+Owner: all institute targets.
 
 --------------------------------------------------
 
@@ -631,23 +548,48 @@ src/
     (student)
 
   components/
+    batch/
+      BatchCard.tsx
+      BatchSelector.tsx
+      BatchContextWrapper.tsx
+      ContextHeader.tsx
+      DashboardSection.tsx
+      EmptyState.tsx
+      MultiBatchAssignment.tsx
+      BatchFilteredListScreen.tsx
+    owner/
+      ManageUserForm.tsx
+    dashboard/
+
+  context/
+    BatchContext.tsx
 
   firebase/
     auth.ts
     firestore.ts
+    instituteAuth.ts
     notes.ts
     attendance.ts
     announcements.ts
     doubts.ts
     fees.ts
+    academic.ts
 
   hooks/
+    useCurrentUser.ts
+    useUserBatches.ts
 
   services/
+    batchUtils.ts
+    batchFiltering.ts
+    academicGrouping.ts
+    roleRouting.ts
 
   constants/
 
   types/
+    user.ts
+    academic.ts
 
 --------------------------------------------------
 
