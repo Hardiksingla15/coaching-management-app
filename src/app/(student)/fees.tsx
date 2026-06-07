@@ -13,7 +13,7 @@ export default function FeesScreen() {
         Fees
       </Text>
       <ContextHeader activeBatch={activeBatch} />
-      <EmptyState message="Fee details for the active batch will appear in the next phase." />
+      <EmptyState message="Fee details for the active subject slot will appear in the next phase." />
     </ScreenContainer>
   );
 }

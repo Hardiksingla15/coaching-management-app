@@ -1,34 +1,32 @@
-import type { AssignedBatch } from "../types/user";
-import { batchesEqual } from "./batchUtils";
+import type { AssignedSubject } from "../types/user";
+import { subjectSlotsEqual } from "./batchUtils";
 
 export type BatchFilterable = {
   classLevel?: string;
   batch?: string;
+  subject?: string;
   class?: string;
 };
 
 export function matchesActiveBatch(
   item: BatchFilterable,
-  activeBatch: AssignedBatch | null
+  activeBatch: AssignedSubject | null
 ): boolean {
-  if (!activeBatch || !item.batch) {
+  if (!activeBatch || !item.batch || !item.subject) {
     return false;
   }
 
   const classLevel = item.classLevel ?? item.class ?? "";
-
-  if (!classLevel) {
-    return item.batch === activeBatch.batch;
-  }
-
   return (
-    classLevel === activeBatch.classLevel && item.batch === activeBatch.batch
+    classLevel === activeBatch.classLevel &&
+    item.batch === activeBatch.batch &&
+    item.subject === activeBatch.subject
   );
 }
 
 export function filterByActiveBatch<T extends BatchFilterable>(
   items: T[],
-  activeBatch: AssignedBatch | null
+  activeBatch: AssignedSubject | null
 ): T[] {
   if (!activeBatch) {
     return [];
@@ -38,8 +36,8 @@ export function filterByActiveBatch<T extends BatchFilterable>(
 }
 
 export function isBatchInList(
-  batch: AssignedBatch,
-  list: AssignedBatch[]
+  batch: AssignedSubject,
+  list: AssignedSubject[]
 ): boolean {
-  return list.some((item) => batchesEqual(item, batch));
+  return list.some((item) => subjectSlotsEqual(item, batch));
 }

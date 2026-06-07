@@ -13,7 +13,7 @@ export default function DoubtsScreen() {
         Doubts
       </Text>
       <ContextHeader activeBatch={activeBatch} />
-      <EmptyState message="Ask and view doubts for the active batch in the next phase." />
+      <EmptyState message="Ask and view doubts for the active subject slot in the next phase." />
     </ScreenContainer>
   );
 }

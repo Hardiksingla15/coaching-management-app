@@ -13,7 +13,7 @@ export default function StudentAttendanceScreen() {
         Attendance
       </Text>
       <ContextHeader activeBatch={activeBatch} />
-      <EmptyState message="Attendance records for the active batch will appear in the next phase." />
+      <EmptyState message="Attendance records for the active subject slot will appear in the next phase." />
     </ScreenContainer>
   );
 }

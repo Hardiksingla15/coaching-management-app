@@ -24,8 +24,8 @@ export default function BatchAwareQuickActions({
   const go = (path: string) => {
     if (!activeBatch) {
       Alert.alert(
-        "Select a batch",
-        "Choose a teaching batch first to continue."
+        "Select a subject slot",
+        "Choose a teaching slot first to continue."
       );
       return;
     }

@@ -12,7 +12,7 @@ export default function StudentModuleCards() {
 
   const go = (path: string) => {
     if (!activeBatch) {
-      Alert.alert("Select a batch", "Choose your batch to view this section.");
+      Alert.alert("Select a slot", "Choose your subject slot to view this section.");
       return;
     }
 
@@ -22,7 +22,7 @@ export default function StudentModuleCards() {
   if (!activeBatch) {
     return (
       <DashboardSection title="Modules">
-        <EmptyState message="Select a batch above to unlock notes, attendance, fees, and more." />
+        <EmptyState message="Select a subject slot above to unlock notes, attendance, fees, and more." />
       </DashboardSection>
     );
   }

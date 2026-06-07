@@ -17,16 +17,16 @@ export default function TeacherDashboard() {
         <AppHeader title="Teacher Dashboard 👨‍🏫" />
 
         <BatchSelector
-          title="Assigned Teaching Batches"
+          title="Assigned Teaching Slots"
           batches={batches}
           selectedBatch={activeBatch}
           onSelect={setActiveBatch}
-          emptyMessage="No teaching batches assigned yet."
+          emptyMessage="No teaching subject slots assigned yet."
         />
 
         <ContextHeader
           activeBatch={activeBatch}
-          subtitle="Quick actions apply to the selected batch"
+          subtitle="Quick actions apply to the selected class-batch-subject slot"
         />
 
         <DashboardSection title="Quick Actions">

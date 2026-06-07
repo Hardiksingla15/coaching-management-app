@@ -51,7 +51,7 @@ export default function OwnerDashboard() {
 
         <DashboardSection title="Institute Management">
           <DashboardCard
-            title="Manage Batches"
+            title="Manage Subject Slots"
             icon="school"
             onPress={() => router.push("/(owner)/manage-batches" as never)}
           />
@@ -73,11 +73,11 @@ export default function OwnerDashboard() {
         </DashboardSection>
 
         <BatchSelector
-          title="My Teaching Batches"
+          title="My Teaching Slots"
           batches={batches}
           selectedBatch={activeBatch}
           onSelect={setActiveBatch}
-          emptyMessage="No personal teaching batches assigned."
+          emptyMessage="No personal teaching slots assigned."
         />
 
         <ContextHeader

@@ -11,40 +11,43 @@ import { Picker } from "@react-native-picker/picker";
 import { COLORS } from "../../constants/colors";
 import { SPACING } from "../../constants/spacing";
 import {
-  dedupeBatches,
-  formatBatchLabel,
-  getBatchKey,
+  dedupeAssignedSubjects,
+  formatSubjectSlotLabel,
+  getSubjectSlotKey,
 } from "../../services/batchUtils";
 import { findAcademicStructure } from "../../services/academicGrouping";
+import { toStudentSlot, toTeachingSlot } from "../../services/subjectSlotSync";
 import type { AcademicStructure } from "../../types/academic";
-import type { AssignedBatch } from "../../types/user";
+import type { AssignedSubject } from "../../types/user";
 import AuthButton from "../AuthButton";
 import EmptyState from "./EmptyState";
 
 type Props = {
   structures: AcademicStructure[];
-  value: AssignedBatch[];
-  onChange: (batches: AssignedBatch[]) => void;
+  value: AssignedSubject[];
+  onChange: (slots: AssignedSubject[]) => void;
+  /** Students get teacherId/teacherName; teachers/owners get slot only. */
+  assignmentRole?: "student" | "teacher";
 };
 
 export default function MultiBatchAssignment({
   structures,
   value,
   onChange,
+  assignmentRole = "student",
 }: Props) {
   const [pickerValue, setPickerValue] = useState("");
-  const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
 
   const structureOptions = useMemo(
     () =>
       structures.map((s) => ({
         key: s.id,
-        value: getBatchKey({
+        value: getSubjectSlotKey({
           classLevel: s.classLevel,
           batch: s.batch,
-          subjects: [],
+          subject: s.subject,
         }),
-        label: `Class ${s.classLevel} · ${s.batch}`,
+        label: `Class ${s.classLevel} · ${s.batch} · ${s.subject}`,
         structure: s,
       })),
     [structures]
@@ -55,46 +58,41 @@ export default function MultiBatchAssignment({
       return undefined;
     }
 
-    const [classLevel, batch] = pickerValue.split("::");
-    return findAcademicStructure(structures, classLevel, batch);
+    const [classLevel, batch, subject] = pickerValue.split("::");
+    return findAcademicStructure(structures, classLevel, batch, subject);
   }, [pickerValue, structures]);
-
-  const toggleSubject = (subject: string) => {
-    setSelectedSubjects((prev) =>
-      prev.includes(subject)
-        ? prev.filter((s) => s !== subject)
-        : [...prev, subject]
-    );
-  };
 
   const handleAddAssignment = () => {
     if (!selectedStructure) {
-      Alert.alert("Error", "Select a batch from academic structure");
+      Alert.alert("Error", "Select a subject slot from academic structure");
       return;
     }
 
-    if (selectedSubjects.length === 0) {
-      Alert.alert("Error", "Select at least one subject");
-      return;
-    }
+    const slot =
+      assignmentRole === "student"
+        ? toStudentSlot(
+            {
+              classLevel: selectedStructure.classLevel,
+              batch: selectedStructure.batch,
+              subject: selectedStructure.subject,
+            },
+            selectedStructure
+          )
+        : toTeachingSlot({
+            classLevel: selectedStructure.classLevel,
+            batch: selectedStructure.batch,
+            subject: selectedStructure.subject,
+          });
 
-    const next = dedupeBatches([
-      ...value,
-      {
-        classLevel: selectedStructure.classLevel,
-        batch: selectedStructure.batch,
-        subjects: selectedSubjects,
-      },
-    ]);
+    const next = dedupeAssignedSubjects([...value, slot]);
 
     onChange(next);
     setPickerValue("");
-    setSelectedSubjects([]);
   };
 
-  const handleRemove = (batch: AssignedBatch) => {
+  const handleRemove = (batch: AssignedSubject) => {
     onChange(
-      value.filter((item) => getBatchKey(item) !== getBatchKey(batch))
+      value.filter((item) => getSubjectSlotKey(item) !== getSubjectSlotKey(batch))
     );
   };
 
@@ -108,15 +106,15 @@ export default function MultiBatchAssignment({
           color: COLORS.text,
         }}
       >
-        Assigned Batches
+        Assigned Subject Slots
       </Text>
 
       {value.length === 0 ? (
-        <EmptyState message="No batches assigned yet. Add one below." />
+        <EmptyState message="No subject slots assigned yet. Add one below." />
       ) : (
         value.map((batch) => (
           <View
-            key={getBatchKey(batch)}
+            key={getSubjectSlotKey(batch)}
             style={{
               backgroundColor: COLORS.card,
               padding: SPACING.md,
@@ -128,7 +126,7 @@ export default function MultiBatchAssignment({
             }}
           >
             <Text style={{ flex: 1, color: COLORS.text, fontSize: 15 }}>
-              {formatBatchLabel(batch)}
+              {formatSubjectSlotLabel(batch)}
             </Text>
             <TouchableOpacity onPress={() => handleRemove(batch)}>
               <Text style={{ color: "#c00", fontWeight: "600" }}>Remove</Text>
@@ -146,7 +144,7 @@ export default function MultiBatchAssignment({
           color: COLORS.text,
         }}
       >
-        Add Batch Assignment
+        Add Subject Slot
       </Text>
 
       {structures.length === 0 ? (
@@ -164,10 +162,9 @@ export default function MultiBatchAssignment({
               selectedValue={pickerValue}
               onValueChange={(val) => {
                 setPickerValue(val);
-                setSelectedSubjects([]);
               }}
             >
-              <Picker.Item label="Select class & batch" value="" />
+              <Picker.Item label="Select class + batch + subject" value="" />
               {structureOptions.map((option) => (
                 <Picker.Item
                   key={option.key}
@@ -178,52 +175,16 @@ export default function MultiBatchAssignment({
             </Picker>
           </View>
 
-          {selectedStructure && (
-            <View style={{ marginBottom: SPACING.sm }}>
-              <Text
-                style={{
-                  marginBottom: SPACING.xs,
-                  color: COLORS.gray,
-                  fontSize: 14,
-                }}
-              >
-                Select subjects (multi-select)
-              </Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                {selectedStructure.subjects.map((subject) => {
-                  const active = selectedSubjects.includes(subject);
-                  return (
-                    <TouchableOpacity
-                      key={subject}
-                      onPress={() => toggleSubject(subject)}
-                      style={{
-                        backgroundColor: active
-                          ? COLORS.primary
-                          : COLORS.card,
-                        paddingVertical: 10,
-                        paddingHorizontal: 14,
-                        borderRadius: 20,
-                        marginRight: SPACING.sm,
-                        borderWidth: 1,
-                        borderColor: COLORS.border,
-                      }}
-                    >
-                      <Text
-                        style={{
-                          color: active ? "#fff" : COLORS.text,
-                          fontWeight: "600",
-                        }}
-                      >
-                        {subject}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            </View>
-          )}
+          {selectedStructure ? (
+            <Text style={{ color: COLORS.gray, marginBottom: SPACING.sm }}>
+              Selected: {selectedStructure.batch} · {selectedStructure.subject}
+              {selectedStructure.assignedTeacherName
+                ? ` · ${selectedStructure.assignedTeacherName}`
+                : ""}
+            </Text>
+          ) : null}
 
-          <AuthButton title="Add Batch" onPress={handleAddAssignment} />
+          <AuthButton title="Add Subject Slot" onPress={handleAddAssignment} />
         </>
       )}
     </View>

@@ -144,7 +144,7 @@ export default function SignupScreen() {
           role: role as UserRole,
           institutionCode:
             role === "student" ? institutionCode : null,
-          assignedBatches: [],
+          assignedSubjects: [],
           createdAt: Date.now(),
         });
         

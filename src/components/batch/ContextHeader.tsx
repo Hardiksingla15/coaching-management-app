@@ -3,10 +3,10 @@ import { Text, View } from "react-native";
 import { COLORS } from "../../constants/colors";
 import { SPACING } from "../../constants/spacing";
 import { formatBatchLabel } from "../../services/batchUtils";
-import type { AssignedBatch } from "../../types/user";
+import type { AssignedSubject } from "../../types/user";
 
 type Props = {
-  activeBatch: AssignedBatch | null;
+  activeBatch: AssignedSubject | null;
   subtitle?: string;
 };
 

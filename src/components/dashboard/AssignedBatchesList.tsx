@@ -2,19 +2,14 @@ import { Text, View } from "react-native";
 
 import { COLORS } from "../../constants/colors";
 import { SPACING } from "../../constants/spacing";
-import type { AssignedBatch } from "../../types/user";
+import type { AssignedSubject } from "../../types/user";
 
 type Props = {
-  batches: AssignedBatch[];
+  batches: AssignedSubject[];
 };
 
-function formatBatchLabel(batch: AssignedBatch) {
-  const subjects =
-    batch.subjects && batch.subjects.length > 0
-      ? ` · ${batch.subjects.join(", ")}`
-      : "";
-
-  return `Class ${batch.classLevel} · ${batch.batch}${subjects}`;
+function formatBatchLabel(batch: AssignedSubject) {
+  return `Class ${batch.classLevel} · ${batch.batch} · ${batch.subject}`;
 }
 
 export default function AssignedBatchesList({ batches }: Props) {
@@ -29,7 +24,7 @@ export default function AssignedBatchesList({ batches }: Props) {
         }}
       >
         <Text style={{ color: COLORS.gray }}>
-          No teaching batches assigned yet.
+          No teaching subject slots assigned yet.
         </Text>
       </View>
     );
@@ -39,7 +34,7 @@ export default function AssignedBatchesList({ batches }: Props) {
     <>
       {batches.map((batch, index) => (
         <View
-          key={`${batch.classLevel}-${batch.batch}-${index}`}
+          key={`${batch.classLevel}-${batch.batch}-${batch.subject}-${index}`}
           style={{
             backgroundColor: COLORS.card,
             padding: SPACING.md,

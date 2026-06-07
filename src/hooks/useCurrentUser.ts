@@ -3,7 +3,7 @@ import { getAuth, onAuthStateChanged, User } from "firebase/auth";
 
 import { app } from "../firebase/config";
 import { getUserData } from "../firebase/firestore";
-import { normalizeUserBatches } from "../services/batchUtils";
+import { normalizeUserAssignedSubjects } from "../services/batchUtils";
 import type { UserProfile } from "../types/user";
 
 export type CurrentUser = UserProfile & {
@@ -34,7 +34,7 @@ export function useCurrentUser() {
           setProfile({
             uid: user.uid,
             ...data,
-            assignedBatches: normalizeUserBatches(data),
+            assignedSubjects: normalizeUserAssignedSubjects(data),
             institutionCode: data.institutionCode ?? null,
           });
         } else {

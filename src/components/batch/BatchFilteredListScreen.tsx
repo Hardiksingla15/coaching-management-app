@@ -66,7 +66,7 @@ export default function BatchFilteredListScreen<
       <ContextHeader activeBatch={activeBatch} />
 
       {!activeBatch ? (
-        <EmptyState message="Select a batch on the dashboard first." />
+        <EmptyState message="Select a subject slot on the dashboard first." />
       ) : (
         <FlatList
           data={filteredItems}

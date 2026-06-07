@@ -1,13 +1,13 @@
 import { useMemo } from "react";
 
-import { normalizeUserBatches } from "../services/batchUtils";
+import { normalizeUserAssignedSubjects } from "../services/batchUtils";
 import { useCurrentUser } from "./useCurrentUser";
 
 export function useUserBatches() {
   const { user, loading, firebaseUser } = useCurrentUser();
 
   const batches = useMemo(
-    () => normalizeUserBatches(user ?? undefined),
+    () => normalizeUserAssignedSubjects(user ?? undefined),
     [user]
   );
 

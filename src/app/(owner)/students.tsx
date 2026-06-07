@@ -10,19 +10,41 @@ import { useFocusEffect, useRouter } from "expo-router";
 
 import ScreenContainer from "../../components/ScreenContainer";
 import AuthButton from "../../components/AuthButton";
-import { formatBatchShort } from "../../services/batchUtils";
+import { formatBatchShort, getSubjectSlotKey } from "../../services/batchUtils";
+import { getAcademicStructures } from "../../firebase/academic";
 import { getAllStudents } from "../../firebase/firestore";
-import type { UserProfileWithId } from "../../types/user";
+import { toStudentSlot } from "../../services/subjectSlotSync";
+import type { AcademicStructure } from "../../types/academic";
+import type { AssignedSubject, UserProfileWithId } from "../../types/user";
+
+function enrichStudentSlots(
+  slots: AssignedSubject[] | undefined,
+  structures: AcademicStructure[]
+) {
+  const structureMap = new Map(
+    structures.map((structure) => [getSubjectSlotKey(structure), structure])
+  );
+
+  return (slots ?? []).map((slot) => {
+    const structure = structureMap.get(getSubjectSlotKey(slot));
+    return structure ? toStudentSlot(slot, structure) : slot;
+  });
+}
 
 export default function OwnerStudentsScreen() {
   const router = useRouter();
   const [students, setStudents] = useState<UserProfileWithId[]>([]);
+  const [structures, setStructures] = useState<AcademicStructure[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchStudents = async () => {
     try {
-      const data = await getAllStudents();
+      const [data, academicStructures] = await Promise.all([
+        getAllStudents(),
+        getAcademicStructures(),
+      ]);
       setStudents(data as UserProfileWithId[]);
+      setStructures(academicStructures);
     } catch {
       console.log("Failed to fetch students");
     } finally {
@@ -77,7 +99,10 @@ export default function OwnerStudentsScreen() {
         data={students}
         keyExtractor={(item) => item.id}
         style={{ marginTop: 16 }}
-        renderItem={({ item }) => (
+        renderItem={({ item }) => {
+          const slots = enrichStudentSlots(item.assignedSubjects, structures);
+
+          return (
           <TouchableOpacity
             onPress={() =>
               router.push({
@@ -94,21 +119,20 @@ export default function OwnerStudentsScreen() {
           >
             <Text style={{ fontSize: 18, fontWeight: "bold" }}>{item.name}</Text>
             <Text style={{ marginTop: 5, color: "gray" }}>{item.mobile}</Text>
-            <Text style={{ marginTop: 10, fontWeight: "600" }}>Batches:</Text>
-            {item.assignedBatches?.length ? (
-              item.assignedBatches.map((batch) => (
-                <Text key={`${batch.classLevel}-${batch.batch}`}>
+            <Text style={{ marginTop: 10, fontWeight: "600" }}>Subject slots:</Text>
+            {slots.length ? (
+              slots.map((batch) => (
+                <Text key={`${batch.classLevel}-${batch.batch}-${batch.subject}`}>
                   · {formatBatchShort(batch)}
-                  {batch.subjects?.length
-                    ? ` (${batch.subjects.join(", ")})`
-                    : ""}
+                  {batch.teacherName ? ` · ${batch.teacherName}` : ""}
                 </Text>
               ))
             ) : (
               <Text style={{ color: "gray" }}>Not assigned</Text>
             )}
           </TouchableOpacity>
-        )}
+          );
+        }}
       />
     </ScreenContainer>
   );

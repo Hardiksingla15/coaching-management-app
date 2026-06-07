@@ -1,4 +1,4 @@
-import { collection, addDoc, getDocs } from "firebase/firestore";
+import { collection, addDoc, deleteDoc, doc, getDocs, updateDoc } from "firebase/firestore";
 
 import { db } from "./firestore";
 import type { AcademicStructure } from "../types/academic";
@@ -8,7 +8,10 @@ export const addAcademicStructure = async (
 ) => {
   const existing = await getAcademicStructures();
   const duplicate = existing.some(
-    (s) => s.classLevel === data.classLevel && s.batch === data.batch
+    (s) =>
+      s.classLevel === data.classLevel &&
+      s.batch === data.batch &&
+      s.subject === data.subject
   );
 
   if (duplicate) {
@@ -17,8 +20,8 @@ export const addAcademicStructure = async (
 
   await addDoc(collection(db, "academicStructure"), {
     ...data,
-    subjects: data.subjects ?? [],
-    assignedTeachers: data.assignedTeachers ?? [],
+    assignedTeacherId: data.assignedTeacherId ?? "",
+    assignedTeacherName: data.assignedTeacherName ?? "",
     createdAt: Date.now(),
   });
 };
@@ -30,4 +33,15 @@ export const getAcademicStructures = async (): Promise<AcademicStructure[]> => {
     id: docSnap.id,
     ...(docSnap.data() as Omit<AcademicStructure, "id">),
   }));
+};
+
+export const updateAcademicStructure = async (
+  id: string,
+  data: Partial<Omit<AcademicStructure, "id">>
+) => {
+  await updateDoc(doc(db, "academicStructure", id), data);
+};
+
+export const deleteAcademicStructure = async (id: string) => {
+  await deleteDoc(doc(db, "academicStructure", id));
 };

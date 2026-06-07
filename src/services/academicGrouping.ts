@@ -28,9 +28,13 @@ export function groupAcademicByClass(
 export function findAcademicStructure(
   structures: AcademicStructure[],
   classLevel: string,
-  batch: string
+  batch: string,
+  subject?: string
 ): AcademicStructure | undefined {
   return structures.find(
-    (s) => s.classLevel === classLevel && s.batch === batch
+    (s) =>
+      s.classLevel === classLevel &&
+      s.batch === batch &&
+      (subject ? s.subject === subject : true)
   );
 }

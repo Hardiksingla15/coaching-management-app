@@ -1,632 +1,303 @@
 # PROJECT_ARCHITECTURE.md
 
-# Coaching Institute Management App
+## Coaching Institute Management App (Final Academic Workflow Freeze)
 
-Modern lightweight coaching ERP + LMS hybrid application built using:
-- Expo React Native
+Stack:
 - Expo Router
+- React Native + TypeScript
 - Firebase Auth
 - Firestore
-- Cloudinary
 
-Primary Goal:
-Create a simple, scalable, mobile-first coaching management system for:
-- owners
-- teachers
-- students
+This document freezes the app architecture around **subject-slot operations**.
 
-The app should prioritize:
-- simplicity
-- fast usage
-- clean UX
-- low confusion
-- batch clarity
-- subject clarity
-- owner ease-of-management
+---
 
---------------------------------------------------
+## 1) Core Academic Unit
 
-# 1. TECH STACK
+The app operates on one unit everywhere:
 
-Frontend:
-- Expo React Native
-- Expo Router
-- TypeScript
+`classLevel + batch + subject`
 
-Backend:
-- Firebase Auth
-- Firestore Database
+Examples:
+- `11 | 6am-7am | Physics`
+- `11 | 7am-8am | Chemistry`
 
-Storage:
-- Cloudinary
+---
 
-Hosting:
-- Vercel PWA later
+## 2) Data Model Hierarchy
 
-State:
-- useState/useEffect initially
-- scalable later to Zustand if required
+| Layer | Collection / Field | Role |
+|-------|-------------------|------|
+| **Institute Source of Truth** | `academicStructure` | Canonical registry of all subject slots and teacher assignments |
+| **Denormalized User View** | `users.assignedSubjects` | Per-user copy used for dashboards, context selection, and module filtering |
 
---------------------------------------------------
+Rules:
+- Owner creates and edits slots in `academicStructure`.
+- Changes propagate to `users.assignedSubjects` via sync (`subjectSlotSync`).
+- UI reads user profiles for active-slot context; institute admin screens may read `academicStructure` directly.
+- Legacy user fields (`assignedBatches`, `classLevel`, `batch`, `subjects`) are normalized on read and removed on write.
 
-# 2. USER ROLES
+---
 
-## OWNER
+## 3) Users Collection Model
 
-Institute admin + can also teach.
+Collection: `users`
 
-Permissions:
-- manage all students
-- manage all teachers
-- assign teachers
-- create/edit/delete batches
-- create/edit/delete academic structures
-- manage fees
-- upload notes
-- send announcements
-- manage attendance
-- manage doubts
-- access analytics
-- access all data
-
-Owner has full access.
-
---------------------------------------------------
-
-## TEACHER
-
-Permissions:
-- access assigned batches only
-- upload notes for assigned batches
-- attendance for assigned students only
-- send announcements to assigned batches only
-- answer student doubts
-- view assigned students
-
-Restrictions:
-- cannot manage fees
-- cannot assign teachers
-- cannot access all institute students
-- cannot modify institute structures
-
---------------------------------------------------
-
-## STUDENT
-
-Permissions:
-- view assigned batch data
-- view notes
-- view attendance
-- view announcements
-- view fees
-- ask doubts
-
-Restrictions:
-- only assigned class/batch/subject data visible
-
---------------------------------------------------
-
-# 3. FIRESTORE COLLECTIONS
-
-## users
-
-Primary batch model (single source of truth):
-
+```ts
 {
-  name,
-  mobile,
-  role,
-  institutionCode,
-  assignedBatches: [
+  name: string,
+  mobile: string,
+  role: "owner" | "teacher" | "student",
+  institutionCode: string | null,
+  assignedSubjects: [
     {
-      classLevel: "11",
-      batch: "Morning",
-      subjects: ["Physics", "Chemistry"]
+      classLevel: string,
+      batch: string,
+      subject: string,
+      teacherId?: string,      // students only
+      teacherName?: string     // students only
     }
   ],
-  createdAt
+  createdAt: number
 }
+```
 
 Notes:
-- `assignedBatches` is used for owner, teacher, and student.
-- Legacy `classLevel`, `batch`, `subjects` fields may exist in old documents and are migrated into `assignedBatches` on read.
-- A user may have multiple batch assignments.
+- `assignedSubjects` is the **denormalized user view** — not the institute registry.
+- Teachers and owners store teaching slots only (no `teacherId` / `teacherName`).
+- Students include `teacherId` / `teacherName` from matching `academicStructure` entries.
+- Legacy fields may exist in old docs and are normalized to `assignedSubjects` during reads.
 
---------------------------------------------------
+---
 
-## academicStructure
+## 4) Role Capabilities
 
-Fields:
+### Owner
+- Institute operations: manage students, teachers, subject slots, fees.
+- Teaching operations: same quick actions as teacher for owner’s own assigned subjects.
+- Owner appears in teacher assignment lists.
 
+### Teacher
+- Access only their `assignedSubjects`.
+- Slot-context quick actions: attendance, notes, announcements, doubts.
+
+### Student
+- Sees own `assignedSubjects`.
+- Selects one active subject slot and gets filtered modules.
+
+---
+
+## 5) Routing Structure (Preserved)
+
+`src/app/`
+- `(auth)`
+- `(owner)`
+- `(teacher)`
+- `(student)`
+
+No duplicate routing systems.
+
+---
+
+## 6) Dashboards (Single Dynamic Dashboard Per Role)
+
+### Student Dashboard
+- Top: selectable subject-slot cards.
+- Active context header.
+- Modules filtered by active slot: notes, attendance, announcements, doubts, fees.
+
+### Teacher Dashboard
+- Top: selectable teaching subject-slot cards.
+- Active context header.
+- Quick actions bound to active slot only.
+
+### Owner Dashboard
+- Institute management section.
+- Teaching section with reusable teacher workflows and active slot context.
+
+---
+
+## 7) Academic Structure / Subject Slots
+
+Collection: `academicStructure` — **Institute Source of Truth**
+
+```ts
 {
-  classLevel,
-
-  batch,
-
-  subjects: [],
-
-  assignedTeachers: [],
-
-  createdAt
+  classLevel: string,
+  batch: string,
+  subject: string,
+  assignedTeacherId?: string,
+  assignedTeacherName?: string,
+  createdAt: number
 }
+```
 
-Purpose:
-Central academic configuration.
+Rules:
+- Duplicate prevention on `(classLevel, batch, subject)`.
+- Owner can create and assign teacher/owner to slots.
+- Slot changes sync to `users.assignedSubjects` for affected teachers and students.
 
---------------------------------------------------
+---
 
-## notes
+## 8) Firestore Collections
 
-Fields:
+Only:
+- `users`
+- `academicStructure`
+- `notes`
+- `announcements`
+- `attendance`
+- `doubts`
+- `fees`
 
+---
+
+## 9) Notes Foundation
+
+Collection: `notes`
+
+```ts
 {
-  title,
-
-  description,
-
-  pdfUrl,
-
-  classLevel,
-  batch,
-  subject,
-
-  uploadedBy,
-
-  uploadedAt
+  title: string,
+  description: string,
+  classLevel: string,
+  batch: string,
+  subject: string,
+  uploadedBy?: string,
+  uploadedAt: number,
+  pdfUrl?: string
 }
+```
 
-Purpose:
-PDF notes/resources.
+Cloudinary upload flow is intentionally deferred.
 
---------------------------------------------------
+---
 
-## announcements
+## 10) Attendance Foundation
 
-Fields:
+Collection: `attendance`
 
+```ts
 {
-  title,
-
-  message,
-
-  targetType,
-
-  classLevel,
-  batch,
-  subject,
-
-  multiBatches: [],
-
-  createdBy,
-
-  createdAt
+  studentId: string,
+  classLevel: string,
+  batch: string,
+  subject: string,
+  date: string,
+  status: "present" | "absent",
+  markedBy: string,
+  createdAt: number
 }
+```
 
-targetType values:
-- all
-- class
-- batch
-- multibatch
-- subject
+Designed for date-wise, teacher-filtered, student-specific tracking by subject slot.
 
---------------------------------------------------
+---
 
-## attendance
+## 11) Announcements Foundation
 
-Fields:
+Collection: `announcements`
 
+```ts
 {
-  studentId,
-
-  classLevel,
-  batch,
-  subject,
-
-  date,
-
-  status,
-
-  markedBy,
-
-  createdAt
+  title: string,
+  message: string,
+  targetType: "institute" | "singleSlot" | "multiSlot",
+  classLevel?: string,
+  batch?: string,
+  subject?: string,
+  multiSlots?: [{ classLevel, batch, subject }],
+  createdBy?: string,
+  createdAt: number
 }
+```
 
-status values:
-- present
-- absent
+Student views include:
+- targeted slot announcements
+- institute-wide announcements
 
---------------------------------------------------
+---
 
-## doubts
+## 12) Fees Foundation
 
-Fields:
+Collection: `fees`
 
+```ts
 {
-  studentId,
-  teacherId,
-
-  classLevel,
-  batch,
-  subject,
-
-  message,
-
-  reply,
-
-  status,
-
-  createdAt
+  studentId: string,
+  amount: number,
+  dueDate: string,
+  status: "pending" | "paid",
+  createdAt: number
 }
+```
 
-status values:
-- pending
-- answered
+Notes:
+- Scoped to a student; filter by `studentId` for student fee views.
+- Owner dashboard pending-fees count uses `status == "pending"`.
+- Slot-level fee filtering (by `classLevel + batch + subject`) may be added in a later phase if needed.
 
---------------------------------------------------
+---
 
-## fees
+## 13) Doubts Foundation
 
-Fields:
+Collection: `doubts`
 
+```ts
 {
-  studentId,
-
-  amount,
-
-  status,
-
-  dueDate,
-
-  updatedBy,
-
-  updatedAt
+  studentId: string,
+  teacherId: string,
+  subject: string,
+  question: string,
+  answer?: string,
+  status: "open" | "resolved",
+  createdAt: number
 }
-
-status values:
-- paid
-- pending
-
---------------------------------------------------
-
-# 4. ROLE ACCESS MATRIX
-
-| Feature | Owner | Teacher | Student |
-|---|---|---|---|
-| All Students | YES | NO | NO |
-| Assigned Students | YES | YES | NO |
-| Upload Notes | YES | YES | NO |
-| Batch Notes View | YES | YES | YES |
-| Attendance | YES | YES assigned only | View only |
-| Fees | YES | NO | View only |
-| Announcements | YES | YES assigned only | View only |
-| Doubts | YES | YES | YES |
-| Assign Teachers | YES | NO | NO |
-| Manage Batches | YES | NO | NO |
-
---------------------------------------------------
-
-# 5. BATCH CONTEXT ARCHITECTURE
-
-Core principle:
-- One dynamic dashboard per role (not separate dashboards per batch).
-- User selects an active batch card → session context updates.
-- All modules filter using the active batch context.
-
-Implementation:
-- `BatchContextProvider` stores `activeBatch` for the session.
-- `BatchSelector` + `BatchCard` for selectable batch UI.
-- `batchFiltering.ts` filters notes, announcements, attendance, doubts, fees.
-- `batchUtils.ts` normalizes and deduplicates `assignedBatches`.
-
-Legacy migration:
-- If `assignedBatches` is empty but legacy `classLevel` + `batch` exist, they are merged on read.
-
---------------------------------------------------
-
-# 6. DASHBOARD UX ARCHITECTURE
-
-IMPORTANT:
-Dashboard UX should minimize confusion between:
-- classes
-- batches
-- subjects
-
-The app should always make users understand:
-1. active batch context
-2. current subject scope (within batch)
-3. current notifications
-4. current resources
-
-without deep navigation confusion.
-
---------------------------------------------------
-
-# 7. OWNER DASHBOARD UX
-
-Section 1 — Institute management:
-- overview cards (students, teachers, pending fees)
-- manage academic structure
-- manage students (create/edit/delete, multi-batch assignment)
-- manage teachers (create/edit/delete, multi-batch assignment)
-
-Section 2 — Personal teaching (reuses teacher workflow):
-- selectable assigned teaching batches
-- batch-context quick actions (notes, attendance, announcements, doubts)
-- owner uses the same teacher screens for teaching tools
-
---------------------------------------------------
-
-# 8. TEACHER DASHBOARD UX
-
-1. Selectable assigned batch cards (only assigned batches visible)
-2. Active batch context header
-3. Quick actions apply ONLY to active batch
-4. Teacher cannot access unrelated batches
-
---------------------------------------------------
-
-# 9. STUDENT DASHBOARD UX
-
-1. "Your Batches" — horizontal selectable batch cards
-2. Active batch context header
-3. One dashboard; modules unlock after batch selection
-4. Filtered modules: notes, attendance, fees, announcements, doubts
-
-Student must select a batch before module screens show batch-filtered data.
-
---------------------------------------------------
-
-NOTES UX:
-
-Student first sees:
-Subject Cards
-
-Example:
-- Physics
-- Chemistry
-- Math
-
-After selecting subject:
-show notes/resources.
-
-This avoids mixed content confusion.
-
---------------------------------------------------
-
-ANNOUNCEMENT UX:
-
-Each announcement must display:
-- target batch label
-- subject label
-
-Example:
-[11 Morning - Physics]
-
---------------------------------------------------
-
-ATTENDANCE UX:
-
-Subject-wise attendance cards.
-
-Example:
-- Physics Attendance
-- Chemistry Attendance
-
-Simple percentages.
-
---------------------------------------------------
-
-# 10. MANAGE STUDENTS FEATURE
-
-Owner only.
-
-Features:
-- create / edit / delete student
-- multi-batch assignment UX (`MultiBatchAssignment`)
-- multiple subjects per batch
-- remove individual batch assignments
-
-Uses `assignedBatches[]` as stored model.
-
---------------------------------------------------
-
-# 11. MANAGE TEACHERS FEATURE
-
-Owner only.
-
-Features:
-- create / edit / delete teacher
-- assign multiple teaching batches
-- assign multiple subjects per batch
-- remove batch assignments
-
-Teacher list shows all assigned batches per teacher.
-
---------------------------------------------------
-
-# 12. MULTI-BATCH ANNOUNCEMENTS (planned)
-
-Announcements support:
-- single batch
-- multi-batch (`multiBatches`)
-- class-wide / institute-wide targets
-
-Teachers: only assigned batches.
-Owner: all institute targets.
-
---------------------------------------------------
-
-# 12. NOTES SYSTEM
-
-Teacher uploads:
-- title
-- description
-- PDF
-- batch
-- subject
-
-PDF uploaded to:
-Cloudinary
-
-Metadata stored in:
-Firestore.
-
-Students only see:
-matching notes.
-
---------------------------------------------------
-
-# 13. ANNOUNCEMENT SYSTEM
-
-Owner:
-can send to:
-- all students
-- class-wise
-- batch-wise
-- multi-batch
-- subject-wise
-
-Teacher:
-can send ONLY to assigned batches.
-
-Announcements should support:
-- priority flag
-- pinned flag later
-
---------------------------------------------------
-
-# 14. ATTENDANCE SYSTEM
-
-Teacher marks attendance:
-subject-wise
-batch-wise
-
-Students view:
-subject-wise attendance only.
-
-Owner can view:
-full institute attendance.
-
---------------------------------------------------
-
-# 15. FEES SYSTEM
-
-Owner only management.
-
-Features:
-- pending
-- paid
-- due dates
-- fee reminders
-
-Students only view:
-their fee data.
-
---------------------------------------------------
-
-# 16. DOUBTS SYSTEM
-
-Students:
-ask doubts subject-wise.
-
-Teachers:
-reply to assigned students only.
-
-Owner:
-can monitor all doubts.
-
---------------------------------------------------
-
-# 17. FINAL FOLDER STRUCTURE
-
-src/
-
-  app/
-    (auth)
-    (owner)
-    (teacher)
-    (student)
-
-  components/
-    batch/
-      BatchCard.tsx
-      BatchSelector.tsx
-      BatchContextWrapper.tsx
-      ContextHeader.tsx
-      DashboardSection.tsx
-      EmptyState.tsx
-      MultiBatchAssignment.tsx
-      BatchFilteredListScreen.tsx
-    owner/
-      ManageUserForm.tsx
-    dashboard/
-
-  context/
-    BatchContext.tsx
-
-  firebase/
-    auth.ts
-    firestore.ts
-    instituteAuth.ts
-    notes.ts
-    attendance.ts
-    announcements.ts
-    doubts.ts
-    fees.ts
-    academic.ts
-
-  hooks/
-    useCurrentUser.ts
-    useUserBatches.ts
-
-  services/
-    batchUtils.ts
-    batchFiltering.ts
-    academicGrouping.ts
-    roleRouting.ts
-
-  constants/
-
-  types/
-    user.ts
-    academic.ts
-
---------------------------------------------------
-
-# 18. MVP PRIORITY ORDER
-
-1. Role System
-2. Teacher Assignment
-3. Notes Upload/View
-4. Announcements
-5. Attendance
-6. Fees
-7. Doubts
-
---------------------------------------------------
-
-# 19. IMPORTANT DEVELOPMENT RULES
-
-- maintain clean scalable architecture
-- avoid duplicate Firestore schemas
-- avoid hardcoded batch names
-- all batch/subject data should come from Firestore
-- reusable components preferred
-- keep mobile-first UX
-- reduce student confusion
-- owner operations should require minimum clicks
-- teacher workflows should be batch-context based
-
---------------------------------------------------
-
-# 20. CURSOR IMPLEMENTATION GOAL
-
-Cursor should:
-- generate scalable pages
-- generate CRUD systems
-- maintain role restrictions
-- implement filtering correctly
-- implement Cloudinary uploads
-- keep clean TypeScript architecture
-- keep reusable UI components
-- keep responsive PWA-friendly layouts
+```
+
+Notes:
+- `teacherId` is the assigned teacher for the doubt.
+- `subject` identifies the subject context (may be combined with active slot context in UI).
+- Teachers see open doubts for their students; students see their own doubt history.
+
+---
+
+## 14) Filtering Contract (Reusable)
+
+All current and future modules must filter by:
+- `classLevel`
+- `batch`
+- `subject`
+
+Applied to:
+- notes
+- attendance
+- announcements
+- doubts (where slot context applies)
+- fees (where slot context applies)
+
+---
+
+## 15) Folder Architecture
+
+`src/`
+- `app/(auth|owner|teacher|student)`
+- `components/batch`
+- `components/dashboard`
+- `components/owner`
+- `context/BatchContext.tsx` (active subject-slot context)
+- `firebase/*` (service layer)
+- `hooks/*`
+- `services/*` (slot utils + filtering)
+- `types/*`
+
+---
+
+## 16) Guardrails
+
+- Preserve stable auth and routing flows.
+- No duplicate dashboards.
+- No unnecessary libraries.
+- Keep code beginner-readable and reusable.
+- Build scalable foundations only; avoid production-heavy features in this phase.
+- Treat `academicStructure` as institute truth; keep `users.assignedSubjects` in sync after structure changes.

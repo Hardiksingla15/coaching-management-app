@@ -15,8 +15,9 @@ import {
 } from "../../firebase/firestore";
 import { getAcademicStructures } from "../../firebase/academic";
 import type { AcademicStructure } from "../../types/academic";
-import type { AssignedBatch, UserRole } from "../../types/user";
+import type { AssignedSubject, UserRole } from "../../types/user";
 import { STUDENT_INSTITUTION_CODE } from "../../constants/appConstants";
+import { sanitizeAssignedSubjectsForRole } from "../../services/subjectSlotSync";
 
 type Props = {
   userId?: string;
@@ -30,7 +31,7 @@ export default function ManageUserForm({ userId, role }: Props) {
   const [name, setName] = useState("");
   const [mobile, setMobile] = useState("");
   const [password, setPassword] = useState("");
-  const [assignedBatches, setAssignedBatches] = useState<AssignedBatch[]>([]);
+  const [assignedSubjects, setAssignedSubjects] = useState<AssignedSubject[]>([]);
   const [structures, setStructures] = useState<AcademicStructure[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -57,7 +58,7 @@ export default function ManageUserForm({ userId, role }: Props) {
 
         setName(data.name);
         setMobile(data.mobile);
-        setAssignedBatches(data.assignedBatches ?? []);
+        setAssignedSubjects(data.assignedSubjects ?? []);
       })
       .catch(() => {
         Alert.alert("Error", `Failed to load ${roleLabel.toLowerCase()}`);
@@ -75,8 +76,8 @@ export default function ManageUserForm({ userId, role }: Props) {
       return;
     }
 
-    if (assignedBatches.length === 0) {
-      Alert.alert("Error", "Assign at least one batch");
+    if (assignedSubjects.length === 0) {
+      Alert.alert("Error", "Assign at least one subject slot");
       return;
     }
 
@@ -84,10 +85,16 @@ export default function ManageUserForm({ userId, role }: Props) {
       setLoading(true);
 
       if (isEdit && userId) {
+        const cleaned = sanitizeAssignedSubjectsForRole(
+          role,
+          assignedSubjects,
+          structures
+        );
+
         await updateUserData(userId, {
           name: name.trim(),
           mobile: mobile.trim(),
-          assignedBatches,
+          assignedSubjects: cleaned,
         });
 
         Alert.alert("Success", `${roleLabel} updated`);
@@ -106,7 +113,11 @@ export default function ManageUserForm({ userId, role }: Props) {
         role,
         institutionCode:
           role === "student" ? STUDENT_INSTITUTION_CODE : null,
-        assignedBatches,
+        assignedSubjects: sanitizeAssignedSubjectsForRole(
+          role,
+          assignedSubjects,
+          structures
+        ),
         createdAt: Date.now(),
       });
 
@@ -204,8 +215,9 @@ export default function ManageUserForm({ userId, role }: Props) {
       <View style={{ marginTop: 10 }}>
         <MultiBatchAssignment
           structures={structures}
-          value={assignedBatches}
-          onChange={setAssignedBatches}
+          value={assignedSubjects}
+          onChange={setAssignedSubjects}
+          assignmentRole={role}
         />
       </View>
 

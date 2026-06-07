@@ -16,16 +16,16 @@ export default function StudentDashboard() {
         <AppHeader title="Student Dashboard 🎓" />
 
         <BatchSelector
-          title="Your Batches"
+          title="Your Subject Slots"
           batches={batches}
           selectedBatch={activeBatch}
           onSelect={setActiveBatch}
-          emptyMessage="No batches assigned. Contact your institute."
+          emptyMessage="No subject slots assigned. Contact your institute."
         />
 
         <ContextHeader
           activeBatch={activeBatch}
-          subtitle="Modules below use this batch context"
+          subtitle="Modules below use this selected subject-slot context"
         />
 
         <StudentModuleCards />

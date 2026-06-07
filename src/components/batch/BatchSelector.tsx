@@ -2,25 +2,25 @@ import { ScrollView, View } from "react-native";
 
 import { SPACING } from "../../constants/spacing";
 import { batchesEqual } from "../../services/batchUtils";
-import type { AssignedBatch } from "../../types/user";
+import type { AssignedSubject } from "../../types/user";
 import BatchCard from "./BatchCard";
 import DashboardSection from "./DashboardSection";
 import EmptyState from "./EmptyState";
 
 type Props = {
   title?: string;
-  batches: AssignedBatch[];
-  selectedBatch: AssignedBatch | null;
-  onSelect: (batch: AssignedBatch) => void;
+  batches: AssignedSubject[];
+  selectedBatch: AssignedSubject | null;
+  onSelect: (batch: AssignedSubject) => void;
   emptyMessage?: string;
 };
 
 export default function BatchSelector({
-  title = "Your Batches",
+  title = "Your Subject Slots",
   batches,
   selectedBatch,
   onSelect,
-  emptyMessage = "No batches assigned yet.",
+  emptyMessage = "No subject slots assigned yet.",
 }: Props) {
   return (
     <DashboardSection title={title}>
@@ -34,7 +34,7 @@ export default function BatchSelector({
         >
           {batches.map((batch) => (
             <BatchCard
-              key={`${batch.classLevel}-${batch.batch}`}
+              key={`${batch.classLevel}-${batch.batch}-${batch.subject}`}
               batch={batch}
               selected={
                 selectedBatch

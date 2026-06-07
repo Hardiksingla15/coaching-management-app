@@ -14,7 +14,7 @@ export default function TeacherDoubtsScreen() {
         Doubts
       </Text>
       <ContextHeader activeBatch={activeBatch} />
-      <EmptyState message="Answer doubts for the active batch in the next phase." />
+      <EmptyState message="Answer doubts for the active subject slot in the next phase." />
     </ScreenContainer>
   );
 }

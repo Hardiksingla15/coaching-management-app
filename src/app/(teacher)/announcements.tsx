@@ -14,7 +14,7 @@ export default function AnnouncementsScreen() {
         Announcements
       </Text>
       <ContextHeader activeBatch={activeBatch} />
-      <EmptyState message="Send announcements to the active batch in the next phase." />
+      <EmptyState message="Send announcements to the active subject slot in the next phase." />
     </ScreenContainer>
   );
 }

@@ -3,10 +3,10 @@ import { Text, TouchableOpacity } from "react-native";
 import { COLORS } from "../../constants/colors";
 import { SPACING } from "../../constants/spacing";
 import { formatBatchLabel } from "../../services/batchUtils";
-import type { AssignedBatch } from "../../types/user";
+import type { AssignedSubject } from "../../types/user";
 
 type Props = {
-  batch: AssignedBatch;
+  batch: AssignedSubject;
   selected?: boolean;
   onPress?: () => void;
 };

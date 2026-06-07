@@ -8,13 +8,13 @@ import {
   type ReactNode,
 } from "react";
 
-import type { AssignedBatch } from "../types/user";
-import { batchesEqual, dedupeBatches } from "../services/batchUtils";
+import type { AssignedSubject } from "../types/user";
+import { dedupeAssignedSubjects, subjectSlotsEqual } from "../services/batchUtils";
 
 type BatchContextValue = {
-  batches: AssignedBatch[];
-  activeBatch: AssignedBatch | null;
-  setActiveBatch: (batch: AssignedBatch | null) => void;
+  batches: AssignedSubject[];
+  activeBatch: AssignedSubject | null;
+  setActiveBatch: (batch: AssignedSubject | null) => void;
   hasBatches: boolean;
 };
 
@@ -22,12 +22,12 @@ const BatchContext = createContext<BatchContextValue | null>(null);
 
 type Props = {
   children: ReactNode;
-  batches: AssignedBatch[];
+  batches: AssignedSubject[];
 };
 
 export function BatchContextProvider({ children, batches }: Props) {
-  const normalizedBatches = useMemo(() => dedupeBatches(batches), [batches]);
-  const [activeBatch, setActiveBatchState] = useState<AssignedBatch | null>(
+  const normalizedBatches = useMemo(() => dedupeAssignedSubjects(batches), [batches]);
+  const [activeBatch, setActiveBatchState] = useState<AssignedSubject | null>(
     null
   );
 
@@ -39,7 +39,7 @@ export function BatchContextProvider({ children, batches }: Props) {
 
       if (
         current &&
-        normalizedBatches.some((batch) => batchesEqual(batch, current))
+        normalizedBatches.some((batch) => subjectSlotsEqual(batch, current))
       ) {
         return current;
       }
@@ -48,7 +48,7 @@ export function BatchContextProvider({ children, batches }: Props) {
     });
   }, [normalizedBatches]);
 
-  const setActiveBatch = useCallback((batch: AssignedBatch | null) => {
+  const setActiveBatch = useCallback((batch: AssignedSubject | null) => {
     setActiveBatchState(batch);
   }, []);
 

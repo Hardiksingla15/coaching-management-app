@@ -7,17 +7,20 @@ import {
   type Props = {
     title: string;
     onPress?: () => void;
+    disabled?: boolean;
   };
-  
+
   export default function AuthButton({
     title,
     onPress,
+    disabled = false,
   }: Props) {
     return (
       <TouchableOpacity
-        onPress={onPress}
+        onPress={disabled ? undefined : onPress}
+        disabled={disabled}
         style={{
-          backgroundColor: COLORS.primary,
+          backgroundColor: disabled ? "#999" : COLORS.primary,
           padding: 18,
           borderRadius: 12,
           alignItems: "center",

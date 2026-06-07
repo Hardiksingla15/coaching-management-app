@@ -17,7 +17,7 @@ export default function TeacherNotes() {
 
   const handleAddNote = async () => {
     if (!activeBatch) {
-      Alert.alert("Error", "Select a teaching batch on the dashboard");
+      Alert.alert("Error", "Select a teaching slot on the dashboard");
       return;
     }
 
@@ -32,7 +32,7 @@ export default function TeacherNotes() {
         description,
         classLevel: activeBatch.classLevel,
         batch: activeBatch.batch,
-        subject: subject || activeBatch.subjects[0] || "",
+        subject: subject || activeBatch.subject,
       });
 
       Alert.alert("Success", "Note Added 🚀");
@@ -53,7 +53,7 @@ export default function TeacherNotes() {
       <ContextHeader activeBatch={activeBatch} />
 
       {!activeBatch ? (
-        <EmptyState message="Select an assigned batch on your dashboard first." />
+        <EmptyState message="Select an assigned subject slot on your dashboard first." />
       ) : (
         <>
           <CustomInput
@@ -69,7 +69,7 @@ export default function TeacherNotes() {
           />
 
           <CustomInput
-            placeholder={`Subject (e.g. ${activeBatch.subjects.join(", ") || "Physics"})`}
+            placeholder={`Subject (e.g. ${activeBatch.subject || "Physics"})`}
             value={subject}
             onChangeText={setSubject}
           />

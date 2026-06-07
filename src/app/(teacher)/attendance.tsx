@@ -14,7 +14,7 @@ export default function TeacherAttendanceScreen() {
         Attendance
       </Text>
       <ContextHeader activeBatch={activeBatch} />
-      <EmptyState message="Mark attendance for the active batch in the next phase." />
+      <EmptyState message="Mark attendance for the active subject slot in the next phase." />
     </ScreenContainer>
   );
 }

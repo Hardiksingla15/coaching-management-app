@@ -9,7 +9,7 @@ type Props = {
 };
 
 export default function CurrentBatchCard({ user }: Props) {
-  const hasBatch = user?.classLevel && user?.batch;
+  const firstSlot = user?.assignedSubjects?.[0];
 
   return (
     <View
@@ -27,10 +27,10 @@ export default function CurrentBatchCard({ user }: Props) {
           marginBottom: SPACING.xs,
         }}
       >
-        Current Batch
+        Current Subject Slot
       </Text>
 
-      {hasBatch ? (
+      {firstSlot ? (
         <>
           <Text
             style={{
@@ -39,23 +39,21 @@ export default function CurrentBatchCard({ user }: Props) {
               color: COLORS.text,
             }}
           >
-            Class {user.classLevel} · {user.batch}
+            Class {firstSlot.classLevel} · {firstSlot.batch}
           </Text>
 
-          {user.subjects && user.subjects.length > 0 && (
-            <Text
-              style={{
-                marginTop: SPACING.xs,
-                color: COLORS.gray,
-              }}
-            >
-              Subjects: {user.subjects.join(", ")}
-            </Text>
-          )}
+          <Text
+            style={{
+              marginTop: SPACING.xs,
+              color: COLORS.gray,
+            }}
+          >
+            Subject: {firstSlot.subject}
+          </Text>
         </>
       ) : (
         <Text style={{ color: COLORS.gray }}>
-          Not assigned to a batch yet.
+          Not assigned to a subject slot yet.
         </Text>
       )}
     </View>

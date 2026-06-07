@@ -3,17 +3,17 @@ import {
   doc,
   setDoc,
   getDoc,
-  deleteDoc,
   collection,
   query,
   where,
   getDocs,
   updateDoc,
+  deleteField,
 } from "firebase/firestore";
 
 import { app } from "./config";
 import type { UserProfile, UserRole } from "../types/user";
-import { normalizeUserBatches } from "../services/batchUtils";
+import { normalizeUserAssignedSubjects } from "../services/batchUtils";
 
 export const db = getFirestore(app);
 
@@ -21,7 +21,18 @@ export const saveUserData = async (
   uid: string,
   data: Partial<UserProfile>
 ) => {
-  await setDoc(doc(db, "users", uid), data, { merge: true });
+  await setDoc(
+    doc(db, "users", uid),
+    {
+      ...data,
+      // ensure legacy fields don't keep reappearing on fresh writes
+      assignedBatches: deleteField(),
+      classLevel: deleteField(),
+      batch: deleteField(),
+      subjects: deleteField(),
+    },
+    { merge: true }
+  );
 };
 
 export const getUserData = async (
@@ -36,7 +47,7 @@ export const getUserData = async (
 
   return {
     ...data,
-    assignedBatches: normalizeUserBatches(data),
+    assignedSubjects: normalizeUserAssignedSubjects(data),
   };
 };
 
@@ -57,7 +68,7 @@ export const getUserByMobile = async (
   const data = querySnapshot.docs[0].data() as UserProfile;
   return {
     ...data,
-    assignedBatches: normalizeUserBatches(data),
+    assignedSubjects: normalizeUserAssignedSubjects(data),
   };
 };
 
@@ -71,7 +82,7 @@ export const getUsersByRole = async (role: UserRole) => {
     return {
       id: docSnap.id,
       ...data,
-      assignedBatches: normalizeUserBatches(data),
+      assignedSubjects: normalizeUserAssignedSubjects(data),
     };
   });
 };
@@ -80,18 +91,54 @@ export const getAllStudents = async () => getUsersByRole("student");
 
 export const getAllTeachers = async () => getUsersByRole("teacher");
 
+/** Teachers list for slot assignment (teachers + owners). */
+export const getAllTeachables = async () => {
+  const [teachers, owners] = await Promise.all([
+    getUsersByRole("teacher"),
+    getUsersByRole("owner"),
+  ]);
+  return [...teachers, ...owners];
+};
+
 export const updateUserData = async (
   id: string,
   data: Partial<UserProfile>
 ) => {
-  await updateDoc(doc(db, "users", id), data);
+  await updateDoc(doc(db, "users", id), {
+    ...data,
+    // hard cleanup so Firestore doesn't keep showing old batch fields
+    assignedBatches: deleteField(),
+    classLevel: deleteField(),
+    batch: deleteField(),
+    subjects: deleteField(),
+  });
 };
 
 /** @deprecated Use updateUserData */
 export const updateStudentData = updateUserData;
 
+/** @deprecated use addTeachingSlotToUser from subjectSlotSync */
+export const addAssignedSubjectToUser = async (
+  userId: string,
+  slot: NonNullable<UserProfile["assignedSubjects"]>[number]
+) => {
+  const { addTeachingSlotToUser } = await import("./subjectSlotSync");
+  await addTeachingSlotToUser(userId, slot);
+};
+
+/** @deprecated use removeTeachingSlotFromUser from subjectSlotSync */
+export const removeAssignedSubjectFromUser = async (
+  userId: string,
+  slot: NonNullable<UserProfile["assignedSubjects"]>[number]
+) => {
+  const { removeTeachingSlotFromUser } = await import("./subjectSlotSync");
+  await removeTeachingSlotFromUser(userId, slot);
+};
+
 export const deleteUserProfile = async (id: string) => {
-  await deleteDoc(doc(db, "users", id));
+  const user = await getUserData(id);
+  const { deleteUserAndCleanup } = await import("./subjectSlotSync");
+  await deleteUserAndCleanup(id, user?.role ?? "student");
 };
 
 export type InstituteStats = {
@@ -103,15 +150,15 @@ export type InstituteStats = {
 export const getInstituteStats = async (): Promise<InstituteStats> => {
   const { getPendingFeesCount } = await import("./fees");
 
-  const [students, teachers, pendingFees] = await Promise.all([
+  const [students, teachables, pendingFees] = await Promise.all([
     getAllStudents(),
-    getAllTeachers(),
+    getAllTeachables(),
     getPendingFeesCount().catch(() => 0),
   ]);
 
   return {
     totalStudents: students.length,
-    totalTeachers: teachers.length,
+    totalTeachers: teachables.length,
     pendingFees,
   };
 };

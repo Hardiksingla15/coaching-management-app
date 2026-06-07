@@ -10,7 +10,7 @@ export default function NotesScreen() {
   return (
     <BatchFilteredListScreen
       title="Notes 📚"
-      emptyMessage="No notes for this batch yet."
+      emptyMessage="No notes for this subject slot yet."
       fetchItems={fetchNotes}
       renderItem={(item: any) => (
         <View
