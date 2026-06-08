@@ -18,6 +18,7 @@ export type UserProfile = {
   institutionCode: string | null;
   /** Primary model: all academic assignments live here. */
   assignedSubjects: AssignedSubject[];
+  assignedSlotKeys?: string[];
   createdAt?: number;
   /** @deprecated Legacy fields — migrated into assignedSubjects on read. */
   assignedBatches?: AssignedBatch[];

@@ -56,6 +56,11 @@ export default function OwnerLayout() {
           name="manage-teacher"
           options={{ href: null }}
         />
+
+        <Tabs.Screen
+          name="attendance"
+          options={{ href: null }}
+        />
       </Tabs>
     </BatchContextWrapper>
   );

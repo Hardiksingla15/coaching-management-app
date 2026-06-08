@@ -7,7 +7,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useCallback, useState } from "react";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { Picker } from "@react-native-picker/picker";
 
 import ScreenContainer from "../../components/ScreenContainer";
@@ -50,6 +50,7 @@ type StatusMessage = {
 };
 
 export default function ManageBatches() {
+  const router = useRouter();
   const [classLevel, setClassLevel] = useState("");
   const [batch, setBatch] = useState("");
   const [subject, setSubject] = useState("");
@@ -527,6 +528,40 @@ export default function ManageBatches() {
                       marginTop: 12,
                     }}
                   >
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onPress={() =>
+                        router.push({
+                          pathname: "/(owner)/attendance" as never,
+                          params: {
+                            classLevel: item.classLevel,
+                            batch: item.batch,
+                            subject: item.subject,
+                          },
+                        })
+                      }
+                      disabled={busy}
+                      style={{
+                        minHeight: 44,
+                        paddingHorizontal: 12,
+                        paddingVertical: 10,
+                        borderRadius: 8,
+                        backgroundColor: busy ? "#ddd" : "#e2e8f0",
+                        marginRight: 12,
+                        justifyContent: "center",
+                        alignItems: "center",
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontWeight: "700",
+                          fontSize: 15,
+                          color: busy ? "#888" : "#475569",
+                        }}
+                      >
+                        Attendance
+                      </Text>
+                    </TouchableOpacity>
                     <TouchableOpacity
                       activeOpacity={0.7}
                       onPress={() => handleEditSlot(item)}

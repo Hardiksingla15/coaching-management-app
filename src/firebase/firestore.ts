@@ -13,7 +13,7 @@ import {
 
 import { app } from "./config";
 import type { UserProfile, UserRole } from "../types/user";
-import { normalizeUserAssignedSubjects } from "../services/batchUtils";
+import { normalizeUserAssignedSubjects, getSubjectSlotKey } from "../services/batchUtils";
 
 export const db = getFirestore(app);
 
@@ -21,10 +21,15 @@ export const saveUserData = async (
   uid: string,
   data: Partial<UserProfile>
 ) => {
+  const updates: Partial<UserProfile> = { ...data };
+  if (data.assignedSubjects) {
+    updates.assignedSlotKeys = data.assignedSubjects.map(getSubjectSlotKey);
+  }
+
   await setDoc(
     doc(db, "users", uid),
     {
-      ...data,
+      ...updates,
       // ensure legacy fields don't keep reappearing on fresh writes
       assignedBatches: deleteField(),
       classLevel: deleteField(),
@@ -104,8 +109,13 @@ export const updateUserData = async (
   id: string,
   data: Partial<UserProfile>
 ) => {
+  const updates: Partial<UserProfile> = { ...data };
+  if (data.assignedSubjects) {
+    updates.assignedSlotKeys = data.assignedSubjects.map(getSubjectSlotKey);
+  }
+
   await updateDoc(doc(db, "users", id), {
-    ...data,
+    ...updates,
     // hard cleanup so Firestore doesn't keep showing old batch fields
     assignedBatches: deleteField(),
     classLevel: deleteField(),

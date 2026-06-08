@@ -14,6 +14,10 @@ import {
   updateUserData,
 } from "../../firebase/firestore";
 import { getAcademicStructures } from "../../firebase/academic";
+import {
+  syncAllTeachableSlotsFromStructure,
+  syncStudentTeacherFieldsFromStructure,
+} from "../../firebase/subjectSlotSync";
 import type { AcademicStructure } from "../../types/academic";
 import type { AssignedSubject, UserRole } from "../../types/user";
 import { STUDENT_INSTITUTION_CODE } from "../../constants/appConstants";
@@ -97,6 +101,12 @@ export default function ManageUserForm({ userId, role }: Props) {
           assignedSubjects: cleaned,
         });
 
+        if (role === "student") {
+          await syncStudentTeacherFieldsFromStructure();
+        } else {
+          await syncAllTeachableSlotsFromStructure();
+        }
+
         Alert.alert("Success", `${roleLabel} updated`);
         router.back();
         return;
@@ -120,6 +130,12 @@ export default function ManageUserForm({ userId, role }: Props) {
         ),
         createdAt: Date.now(),
       });
+
+      if (role === "student") {
+        await syncStudentTeacherFieldsFromStructure();
+      } else {
+        await syncAllTeachableSlotsFromStructure();
+      }
 
       Alert.alert("Success", `${roleLabel} created`);
       router.back();
