@@ -13,7 +13,7 @@ import {
   saveUserData,
   updateUserData,
 } from "../../firebase/firestore";
-import { getAcademicStructures } from "../../firebase/academic";
+import { getAcademicStructures, updateAcademicStructure } from "../../firebase/academic";
 import {
   syncAllTeachableSlotsFromStructure,
   syncStudentTeacherFieldsFromStructure,
@@ -22,6 +22,7 @@ import type { AcademicStructure } from "../../types/academic";
 import type { AssignedSubject, UserRole } from "../../types/user";
 import { STUDENT_INSTITUTION_CODE } from "../../constants/appConstants";
 import { sanitizeAssignedSubjectsForRole } from "../../services/subjectSlotSync";
+
 
 type Props = {
   userId?: string;
@@ -38,6 +39,7 @@ export default function ManageUserForm({ userId, role }: Props) {
   const [assignedSubjects, setAssignedSubjects] = useState<AssignedSubject[]>([]);
   const [structures, setStructures] = useState<AcademicStructure[]>([]);
   const [loading, setLoading] = useState(false);
+  const [originalSubjects, setOriginalSubjects] = useState<AssignedSubject[]>([]);
 
   const roleLabel = role === "student" ? "Student" : "Teacher";
 
@@ -62,12 +64,65 @@ export default function ManageUserForm({ userId, role }: Props) {
 
         setName(data.name);
         setMobile(data.mobile);
-        setAssignedSubjects(data.assignedSubjects ?? []);
+        const subjects = data.assignedSubjects ?? [];
+        setAssignedSubjects([...subjects]);
+        setOriginalSubjects([...subjects]);
       })
       .catch(() => {
         Alert.alert("Error", `Failed to load ${roleLabel.toLowerCase()}`);
       });
   }, [userId, roleLabel]);
+
+  const syncAcademicStructureForTeacher = async (
+    teacherId: string,
+    teacherName: string,
+    oldSlots: AssignedSubject[],
+    newSlots: AssignedSubject[],
+    structuresList: AcademicStructure[]
+  ) => {
+    const getNormalizedKey = (slot: AssignedSubject) => {
+      const cls = String(slot.classLevel ?? "").trim().toLowerCase();
+      const bch = String(slot.batch ?? "").trim().toLowerCase();
+      const sbj = String(slot.subject ?? "").trim().toLowerCase();
+      return `${cls}::${bch}::${sbj}`;
+    };
+
+    const oldKeys = new Set(oldSlots.map(getNormalizedKey));
+    const newKeys = new Set(newSlots.map(getNormalizedKey));
+
+    const removed = oldSlots.filter((s) => !newKeys.has(getNormalizedKey(s)));
+    const added = newSlots.filter((s) => !oldKeys.has(getNormalizedKey(s)));
+
+    for (const slot of removed) {
+      const struct = structuresList.find(
+        (s) =>
+          String(s.classLevel ?? "").trim().toLowerCase() === String(slot.classLevel ?? "").trim().toLowerCase() &&
+          String(s.batch ?? "").trim().toLowerCase() === String(slot.batch ?? "").trim().toLowerCase() &&
+          String(s.subject ?? "").trim().toLowerCase() === String(slot.subject ?? "").trim().toLowerCase()
+      );
+      if (struct) {
+        await updateAcademicStructure(struct.id, {
+          assignedTeacherId: "",
+          assignedTeacherName: "",
+        });
+      }
+    }
+
+    for (const slot of added) {
+      const struct = structuresList.find(
+        (s) =>
+          String(s.classLevel ?? "").trim().toLowerCase() === String(slot.classLevel ?? "").trim().toLowerCase() &&
+          String(s.batch ?? "").trim().toLowerCase() === String(slot.batch ?? "").trim().toLowerCase() &&
+          String(s.subject ?? "").trim().toLowerCase() === String(slot.subject ?? "").trim().toLowerCase()
+      );
+      if (struct) {
+        await updateAcademicStructure(struct.id, {
+          assignedTeacherId: teacherId,
+          assignedTeacherName: teacherName,
+        });
+      }
+    }
+  };
 
   const handleSave = async () => {
     if (!name.trim() || !mobile.trim()) {
@@ -80,10 +135,7 @@ export default function ManageUserForm({ userId, role }: Props) {
       return;
     }
 
-    if (assignedSubjects.length === 0) {
-      Alert.alert("Error", "Assign at least one subject slot");
-      return;
-    }
+
 
     try {
       setLoading(true);
@@ -95,6 +147,16 @@ export default function ManageUserForm({ userId, role }: Props) {
           structures
         );
 
+        if (role === "teacher") {
+          await syncAcademicStructureForTeacher(
+            userId,
+            name.trim(),
+            originalSubjects,
+            cleaned,
+            structures
+          );
+        }
+
         await updateUserData(userId, {
           name: name.trim(),
           mobile: mobile.trim(),
@@ -105,6 +167,7 @@ export default function ManageUserForm({ userId, role }: Props) {
           await syncStudentTeacherFieldsFromStructure();
         } else {
           await syncAllTeachableSlotsFromStructure();
+          await syncStudentTeacherFieldsFromStructure();
         }
 
         Alert.alert("Success", `${roleLabel} updated`);
@@ -117,17 +180,29 @@ export default function ManageUserForm({ userId, role }: Props) {
         password
       );
 
+      const cleaned = sanitizeAssignedSubjectsForRole(
+        role,
+        assignedSubjects,
+        structures
+      );
+
+      if (role === "teacher") {
+        await syncAcademicStructureForTeacher(
+          credential.user.uid,
+          name.trim(),
+          [],
+          cleaned,
+          structures
+        );
+      }
+
       await saveUserData(credential.user.uid, {
         name: name.trim(),
         mobile: mobile.trim(),
         role,
         institutionCode:
           role === "student" ? STUDENT_INSTITUTION_CODE : null,
-        assignedSubjects: sanitizeAssignedSubjectsForRole(
-          role,
-          assignedSubjects,
-          structures
-        ),
+        assignedSubjects: cleaned,
         createdAt: Date.now(),
       });
 
@@ -135,6 +210,7 @@ export default function ManageUserForm({ userId, role }: Props) {
         await syncStudentTeacherFieldsFromStructure();
       } else {
         await syncAllTeachableSlotsFromStructure();
+        await syncStudentTeacherFieldsFromStructure();
       }
 
       Alert.alert("Success", `${roleLabel} created`);
