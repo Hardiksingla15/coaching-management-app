@@ -16,6 +16,7 @@ import {
   getInstituteStats,
   type InstituteStats,
 } from "../../firebase/firestore";
+import { getFeesSummary, type FeesSummaryStats } from "../../firebase/fees";
 
 export default function OwnerDashboard() {
   const router = useRouter();
@@ -25,9 +26,16 @@ export default function OwnerDashboard() {
     totalTeachers: 0,
     pendingFees: 0,
   });
+  const [feeSummary, setFeeSummary] = useState<FeesSummaryStats>({
+    totalAssigned: 0,
+    totalCollected: 0,
+    totalPending: 0,
+    studentsPendingCount: 0,
+  });
 
   useEffect(() => {
     getInstituteStats().then(setStats).catch(() => {});
+    getFeesSummary().then(setFeeSummary).catch(() => {});
   }, []);
 
   return (
@@ -46,7 +54,28 @@ export default function OwnerDashboard() {
             <StatCard label="Students" value={stats.totalStudents} />
             <StatCard label="Teachers" value={stats.totalTeachers} />
           </View>
-          <StatCard label="Pending Fees" value={stats.pendingFees} />
+        </DashboardSection>
+
+        <DashboardSection title="Fees Summary">
+          <View
+            style={{
+              flexDirection: "row",
+              gap: SPACING.sm,
+              marginBottom: SPACING.sm,
+            }}
+          >
+            <StatCard label="Total Assigned" value={`₹${feeSummary.totalAssigned}`} />
+            <StatCard label="Total Collected" value={`₹${feeSummary.totalCollected}`} />
+          </View>
+          <View
+            style={{
+              flexDirection: "row",
+              gap: SPACING.sm,
+            }}
+          >
+            <StatCard label="Total Pending" value={`₹${feeSummary.totalPending}`} />
+            <StatCard label="Students Pending" value={feeSummary.studentsPendingCount} />
+          </View>
         </DashboardSection>
 
         <DashboardSection title="Institute Management">
@@ -66,9 +95,9 @@ export default function OwnerDashboard() {
             onPress={() => router.push("/(owner)/teachers" as never)}
           />
           <DashboardCard
-            title="Fees (coming soon)"
+            title="Manage Fees"
             icon="cash"
-            onPress={() => {}}
+            onPress={() => router.push("/(owner)/fees" as never)}
           />
         </DashboardSection>
 
@@ -92,3 +121,4 @@ export default function OwnerDashboard() {
     </ScreenContainer>
   );
 }
+

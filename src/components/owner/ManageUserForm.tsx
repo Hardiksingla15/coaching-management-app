@@ -22,6 +22,8 @@ import type { AcademicStructure } from "../../types/academic";
 import type { AssignedSubject, UserRole } from "../../types/user";
 import { STUDENT_INSTITUTION_CODE } from "../../constants/appConstants";
 import { sanitizeAssignedSubjectsForRole } from "../../services/subjectSlotSync";
+import { getSubjectSlotKey } from "../../services/batchUtils";
+import { getStudentFees, assignFeeRecord, deleteFeeRecord } from "../../firebase/fees";
 
 
 type Props = {
@@ -40,6 +42,7 @@ export default function ManageUserForm({ userId, role }: Props) {
   const [structures, setStructures] = useState<AcademicStructure[]>([]);
   const [loading, setLoading] = useState(false);
   const [originalSubjects, setOriginalSubjects] = useState<AssignedSubject[]>([]);
+  const [fees, setFees] = useState<Record<string, number>>({});
 
   const roleLabel = role === "student" ? "Student" : "Teacher";
 
@@ -67,11 +70,28 @@ export default function ManageUserForm({ userId, role }: Props) {
         const subjects = data.assignedSubjects ?? [];
         setAssignedSubjects([...subjects]);
         setOriginalSubjects([...subjects]);
+
+        if (role === "student") {
+          getStudentFees(userId).then((feeRecords) => {
+            const feeMap: Record<string, number> = {};
+            feeRecords.forEach((rec) => {
+              feeMap[getSubjectSlotKey(rec)] = rec.totalFee;
+            });
+            setFees(feeMap);
+          });
+        }
       })
       .catch(() => {
         Alert.alert("Error", `Failed to load ${roleLabel.toLowerCase()}`);
       });
   }, [userId, roleLabel]);
+
+  const handleFeeChange = (slotKey: string, fee: number) => {
+    setFees((prev) => ({
+      ...prev,
+      [slotKey]: fee,
+    }));
+  };
 
   const syncAcademicStructureForTeacher = async (
     teacherId: string,
@@ -157,6 +177,19 @@ export default function ManageUserForm({ userId, role }: Props) {
           );
         }
 
+        if (role === "student") {
+          const newKeys = new Set(cleaned.map(getSubjectSlotKey));
+          const removed = originalSubjects.filter((s) => !newKeys.has(getSubjectSlotKey(s)));
+          
+          for (const slot of removed) {
+            await deleteFeeRecord(userId, slot);
+          }
+          for (const slot of cleaned) {
+            const feeVal = fees[getSubjectSlotKey(slot)] ?? 0;
+            await assignFeeRecord(userId, name.trim(), slot, feeVal);
+          }
+        }
+
         await updateUserData(userId, {
           name: name.trim(),
           mobile: mobile.trim(),
@@ -194,6 +227,13 @@ export default function ManageUserForm({ userId, role }: Props) {
           cleaned,
           structures
         );
+      }
+
+      if (role === "student") {
+        for (const slot of cleaned) {
+          const feeVal = fees[getSubjectSlotKey(slot)] ?? 0;
+          await assignFeeRecord(credential.user.uid, name.trim(), slot, feeVal);
+        }
       }
 
       await saveUserData(credential.user.uid, {
@@ -310,6 +350,8 @@ export default function ManageUserForm({ userId, role }: Props) {
           value={assignedSubjects}
           onChange={setAssignedSubjects}
           assignmentRole={role}
+          fees={fees}
+          onFeeChange={handleFeeChange}
         />
       </View>
 

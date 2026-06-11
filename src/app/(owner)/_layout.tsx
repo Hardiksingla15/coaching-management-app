@@ -61,6 +61,11 @@ export default function OwnerLayout() {
           name="attendance"
           options={{ href: null }}
         />
+
+        <Tabs.Screen
+          name="fees"
+          options={{ href: null }}
+        />
       </Tabs>
     </BatchContextWrapper>
   );

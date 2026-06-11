@@ -5,10 +5,13 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  TextInput,
+  StyleSheet,
 } from "react-native";
-import { useCallback, useState } from "react";
+import { useCallback, useState, useMemo } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
 import { Picker } from "@react-native-picker/picker";
+import { Ionicons } from "@expo/vector-icons";
 
 import ScreenContainer from "../../components/ScreenContainer";
 import CustomInput from "../../components/CustomInput";
@@ -57,13 +60,13 @@ export default function ManageBatches() {
   const [teacherId, setTeacherId] = useState("");
   const [editingSlotId, setEditingSlotId] = useState<string | null>(null);
   const [originalSlot, setOriginalSlot] = useState<SubjectSlot | null>(null);
-  const [originalTeacherId, setOriginalTeacherId] = useState("");
   const [structures, setStructures] = useState<AcademicStructure[]>([]);
   const [teachers, setTeachers] = useState<UserProfileWithId[]>([]);
   const [busy, setBusy] = useState(false);
   const [listLoading, setListLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<StatusMessage | null>(null);
   const [pendingDelete, setPendingDelete] = useState<AcademicStructure | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const showStatus = (type: StatusMessage["type"], title: string, message: string) => {
     setStatusMessage({ type, title, message });
@@ -102,7 +105,6 @@ export default function ManageBatches() {
     setTeacherId("");
     setEditingSlotId(null);
     setOriginalSlot(null);
-    setOriginalTeacherId("");
   };
 
   const handleSave = async () => {
@@ -230,7 +232,6 @@ export default function ManageBatches() {
       batch: slot.batch,
       subject: slot.subject,
     });
-    setOriginalTeacherId(slot.assignedTeacherId ?? "");
     setClassLevel(slot.classLevel);
     setBatch(slot.batch);
     setSubject(slot.subject);
@@ -299,7 +300,19 @@ export default function ManageBatches() {
     }
   };
 
-  const grouped = groupAcademicByClass(structures);
+  const filteredStructures = useMemo(() => {
+    return structures.filter((item) => {
+      const q = searchQuery.toLowerCase().trim();
+      return (
+        item.classLevel.toLowerCase().includes(q) ||
+        item.batch.toLowerCase().includes(q) ||
+        item.subject.toLowerCase().includes(q) ||
+        (item.assignedTeacherName && item.assignedTeacherName.toLowerCase().includes(q))
+      );
+    });
+  }, [structures, searchQuery]);
+
+  const grouped = useMemo(() => groupAcademicByClass(filteredStructures), [filteredStructures]);
 
   return (
     <ScreenContainer>
@@ -482,6 +495,22 @@ export default function ManageBatches() {
           />
         ) : null}
 
+        {/* Search Bar */}
+        <View style={styles.searchContainer}>
+          <Ionicons name="search" size={20} color="#64748b" style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search class, timing, subject, teacher..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery("")}>
+              <Ionicons name="close-circle" size={18} color="#64748b" />
+            </TouchableOpacity>
+          )}
+        </View>
+
         {listLoading ? (
           <ActivityIndicator style={{ marginTop: 16 }} size="large" />
         ) : null}
@@ -623,3 +652,26 @@ export default function ManageBatches() {
     </ScreenContainer>
   );
 }
+
+const styles = StyleSheet.create({
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f1f5f9",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    color: "#0f172a",
+  },
+});
+

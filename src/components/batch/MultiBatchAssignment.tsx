@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import {
   Alert,
-  ScrollView,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -28,6 +28,8 @@ type Props = {
   onChange: (slots: AssignedSubject[]) => void;
   /** Students get teacherId/teacherName; teachers/owners get slot only. */
   assignmentRole?: "student" | "teacher";
+  fees?: Record<string, number>;
+  onFeeChange?: (slotKey: string, fee: number) => void;
 };
 
 export default function MultiBatchAssignment({
@@ -35,6 +37,8 @@ export default function MultiBatchAssignment({
   value,
   onChange,
   assignmentRole = "student",
+  fees,
+  onFeeChange,
 }: Props) {
   const [pickerValue, setPickerValue] = useState("");
 
@@ -123,13 +127,51 @@ export default function MultiBatchAssignment({
               flexDirection: "row",
               justifyContent: "space-between",
               alignItems: "center",
+              borderWidth: 1,
+              borderColor: "#e2e8f0",
             }}
           >
-            <Text style={{ flex: 1, color: COLORS.text, fontSize: 15 }}>
-              {formatSubjectSlotLabel(batch)}
-            </Text>
-            <TouchableOpacity onPress={() => handleRemove(batch)}>
-              <Text style={{ color: "#c00", fontWeight: "600" }}>Remove</Text>
+            <View style={{ flex: 1, marginRight: 12 }}>
+              <Text style={{ color: COLORS.text, fontSize: 15, fontWeight: "600" }}>
+                {formatSubjectSlotLabel(batch)}
+              </Text>
+              {assignmentRole === "student" && fees && onFeeChange && (
+                <View style={{ flexDirection: "row", alignItems: "center", marginTop: 8 }}>
+                  <Text style={{ color: COLORS.gray, fontSize: 14, fontWeight: "500" }}>Fee: ₹</Text>
+                  <TextInput
+                    style={{
+                      borderWidth: 1,
+                      borderColor: "#cbd5e1",
+                      borderRadius: 8,
+                      paddingHorizontal: 8,
+                      paddingVertical: 3,
+                      fontSize: 14,
+                      color: COLORS.text,
+                      minWidth: 90,
+                      backgroundColor: "#fff",
+                      marginLeft: 4,
+                    }}
+                    keyboardType="numeric"
+                    value={String(fees[getSubjectSlotKey(batch)] ?? 0)}
+                    onChangeText={(text) => {
+                      const cleanText = text.replace(/[^0-9]/g, "");
+                      const num = parseFloat(cleanText) || 0;
+                      onFeeChange(getSubjectSlotKey(batch), num);
+                    }}
+                  />
+                </View>
+              )}
+            </View>
+            <TouchableOpacity 
+              onPress={() => handleRemove(batch)}
+              style={{
+                paddingVertical: 6,
+                paddingHorizontal: 10,
+                backgroundColor: "#fee2e2",
+                borderRadius: 8,
+              }}
+            >
+              <Text style={{ color: "#dc2626", fontWeight: "700", fontSize: 13 }}>Remove</Text>
             </TouchableOpacity>
           </View>
         ))
