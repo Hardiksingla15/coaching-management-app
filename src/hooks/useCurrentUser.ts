@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { getAuth, onAuthStateChanged, User } from "firebase/auth";
 
 import { app } from "../firebase/config";
@@ -14,6 +14,30 @@ export function useCurrentUser() {
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<CurrentUser | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const refreshProfile = useCallback(async () => {
+    const auth = getAuth(app);
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      setProfile(null);
+      return;
+    }
+    try {
+      const data = await getUserData(currentUser.uid);
+      if (data) {
+        setProfile({
+          uid: currentUser.uid,
+          ...data,
+          assignedSubjects: normalizeUserAssignedSubjects(data),
+          institutionCode: data.institutionCode ?? null,
+        });
+      } else {
+        setProfile(null);
+      }
+    } catch (error) {
+      console.error("Failed to refresh user profile:", error);
+    }
+  }, []);
 
   useEffect(() => {
     const auth = getAuth(app);
@@ -50,5 +74,6 @@ export function useCurrentUser() {
     return unsubscribe;
   }, []);
 
-  return { firebaseUser, user: profile, loading };
+  return { firebaseUser, user: profile, loading, refreshProfile };
 }
+

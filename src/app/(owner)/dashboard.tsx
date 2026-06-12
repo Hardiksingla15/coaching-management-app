@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { ScrollView, View } from "react-native";
+import { useEffect, useState, useCallback } from "react";
+import { ScrollView, View, RefreshControl } from "react-native";
 import { useRouter } from "expo-router";
 
 import AppHeader from "../../components/AppHeader";
@@ -31,21 +31,41 @@ export default function OwnerDashboard() {
     totalPending: 0,
     studentsPendingCount: 0,
   });
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    Promise.all([
-      getInstituteStats(),
-      getFeesSummary()
-    ]).then(([statsData, feeSummaryData]) => {
+  const loadData = useCallback(async () => {
+    try {
+      const [statsData, feeSummaryData] = await Promise.all([
+        getInstituteStats(),
+        getFeesSummary(),
+      ]);
       setStats(statsData);
       setFeeSummary(feeSummaryData);
-    }).catch(() => {});
+    } catch (error) {
+      console.error("Failed to load dashboard data:", error);
+    }
   }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
+  }, [loadData]);
 
   return (
     <ScreenContainer>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
         <AppHeader title="Owner Dashboard" />
+
 
         <DashboardSection title="Institute Overview">
           <View

@@ -6,12 +6,11 @@ import {
   ActivityIndicator,
   StyleSheet,
   TextInput,
-  TouchableOpacity,
 } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import { useLocalSearchParams } from "expo-router";
 
 import ScreenContainer from "../../components/ScreenContainer";
+import AppHeader from "../../components/AppHeader";
 import ContextHeader from "../../components/batch/ContextHeader";
 import EmptyState from "../../components/batch/EmptyState";
 import { useBatchContext } from "../../context/BatchContext";
@@ -37,7 +36,6 @@ type StudentLog = {
 };
 
 export default function OwnerAttendanceScreen() {
-  const router = useRouter();
   const params = useLocalSearchParams<{
     classLevel?: string;
     batch?: string;
@@ -102,12 +100,7 @@ export default function OwnerAttendanceScreen() {
   if (!slot) {
     return (
       <ScreenContainer>
-        <View style={styles.headerRow}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color="#0f172a" />
-          </TouchableOpacity>
-          <Text style={styles.title}>Slot Attendance</Text>
-        </View>
+        <AppHeader title="Slot Attendance" showBack={true} showLogout={false} />
         <EmptyState message="No subject slot specified." />
       </ScreenContainer>
     );
@@ -121,12 +114,8 @@ export default function OwnerAttendanceScreen() {
 
   return (
     <ScreenContainer>
-      <View style={styles.headerRow}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#0f172a" />
-        </TouchableOpacity>
-        <Text style={styles.title}>Slot Attendance</Text>
-      </View>
+      <AppHeader title="Slot Attendance" showBack={true} showLogout={false} />
+
 
       <ContextHeader activeBatch={slot} />
 

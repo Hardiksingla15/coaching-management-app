@@ -1,4 +1,5 @@
-import { ScrollView } from "react-native";
+import { useState, useCallback } from "react";
+import { ScrollView, RefreshControl } from "react-native";
 
 import AppHeader from "../../components/AppHeader";
 import ScreenContainer from "../../components/ScreenContainer";
@@ -7,14 +8,29 @@ import ContextHeader from "../../components/batch/ContextHeader";
 import DashboardSection from "../../components/batch/DashboardSection";
 import BatchAwareQuickActions from "../../components/dashboard/BatchAwareQuickActions";
 import { useBatchContext } from "../../context/BatchContext";
+import { useCurrentUser } from "../../hooks/useCurrentUser";
 
 export default function TeacherDashboard() {
   const { batches, activeBatch, setActiveBatch } = useBatchContext();
+  const { refreshProfile } = useCurrentUser();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await refreshProfile();
+    setRefreshing(false);
+  }, [refreshProfile]);
 
   return (
     <ScreenContainer>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
         <AppHeader title="Teacher Dashboard 👨‍🏫" />
+
 
         <BatchSelector
           title="Assigned Teaching Slots"

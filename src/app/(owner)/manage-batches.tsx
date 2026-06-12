@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   TextInput,
   StyleSheet,
+  RefreshControl,
 } from "react-native";
 import { useCallback, useState, useMemo } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -14,6 +15,7 @@ import { Picker } from "@react-native-picker/picker";
 import { Ionicons } from "@expo/vector-icons";
 
 import ScreenContainer from "../../components/ScreenContainer";
+import AppHeader from "../../components/AppHeader";
 import CustomInput from "../../components/CustomInput";
 import AuthButton from "../../components/AuthButton";
 import {
@@ -67,6 +69,14 @@ export default function ManageBatches() {
   const [statusMessage, setStatusMessage] = useState<StatusMessage | null>(null);
   const [pendingDelete, setPendingDelete] = useState<AcademicStructure | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await Promise.all([fetchStructures(), refresh()]);
+    setRefreshing(false);
+  }, [refresh]);
+
 
   const showStatus = (type: StatusMessage["type"], title: string, message: string) => {
     setStatusMessage({ type, title, message });
@@ -320,6 +330,9 @@ export default function ManageBatches() {
         keyboardShouldPersistTaps="handled"
         nestedScrollEnabled
         contentContainerStyle={{ paddingBottom: 32 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       >
         {pendingDelete ? (
           <View
@@ -407,15 +420,7 @@ export default function ManageBatches() {
           </View>
         ) : null}
 
-        <Text
-          style={{
-            fontSize: 28,
-            fontWeight: "bold",
-            marginBottom: 20,
-          }}
-        >
-          Manage Subject Slots 🎓
-        </Text>
+        <AppHeader title="Manage Slots 🎓" showLogout={false} />
 
         {editingSlotId ? (
           <Text style={{ marginBottom: 12, color: "#555" }}>

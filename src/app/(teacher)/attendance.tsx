@@ -12,6 +12,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 
 import ScreenContainer from "../../components/ScreenContainer";
+import AppHeader from "../../components/AppHeader";
 import ContextHeader from "../../components/batch/ContextHeader";
 import EmptyState from "../../components/batch/EmptyState";
 import AuthButton from "../../components/AuthButton";
@@ -89,6 +90,24 @@ export default function TeacherAttendanceScreen() {
     loadData();
   }, [loadData]);
 
+  const adjustDate = (days: number) => {
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(date)) return;
+
+    const [year, month, day] = date.split("-").map(Number);
+    const d = new Date(year, month - 1, day);
+    d.setDate(d.getDate() + days);
+
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    setDate(`${y}-${m}-${dd}`);
+  };
+
+  const markAllPresent = () => {
+    setStudents((prev) => prev.map((s) => ({ ...s, status: "present" })));
+  };
+
   const toggleStatus = (studentId: string) => {
     setStudents((prev) =>
       prev.map((student) => {
@@ -144,7 +163,7 @@ export default function TeacherAttendanceScreen() {
   if (!activeBatch) {
     return (
       <ScreenContainer>
-        <Text style={styles.title}>Attendance 📅</Text>
+        <AppHeader title="Attendance 📅" showLogout={false} />
         <EmptyState message="Select a subject slot on the dashboard first." />
       </ScreenContainer>
     );
@@ -152,19 +171,27 @@ export default function TeacherAttendanceScreen() {
 
   return (
     <ScreenContainer>
-      <Text style={styles.title}>Attendance 📅</Text>
+      <AppHeader title="Attendance 📅" showLogout={false} />
       <ContextHeader activeBatch={activeBatch} />
 
       <View style={styles.dateSelectorContainer}>
-        <Text style={styles.dateLabel}>Date (YYYY-MM-DD):</Text>
-        <TextInput
-          style={styles.dateInput}
-          value={date}
-          onChangeText={setDate}
-          placeholder="YYYY-MM-DD"
-          keyboardType="numeric"
-          maxLength={10}
-        />
+        <Text style={styles.dateLabel}>Date:</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", flex: 1, justifyContent: "space-between" }}>
+          <TouchableOpacity onPress={() => adjustDate(-1)} style={{ padding: 8 }}>
+            <Ionicons name="chevron-back" size={24} color="#1e293b" />
+          </TouchableOpacity>
+          <TextInput
+            style={[styles.dateInput, { flex: 1, marginHorizontal: 8 }]}
+            value={date}
+            onChangeText={setDate}
+            placeholder="YYYY-MM-DD"
+            keyboardType="numeric"
+            maxLength={10}
+          />
+          <TouchableOpacity onPress={() => adjustDate(1)} style={{ padding: 8 }}>
+            <Ionicons name="chevron-forward" size={24} color="#1e293b" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {loading ? (
@@ -175,6 +202,27 @@ export default function TeacherAttendanceScreen() {
         <EmptyState message="No students are currently assigned to this subject slot." />
       ) : (
         <>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <Text style={{ fontSize: 16, fontWeight: "600", color: "#475569" }}>
+              Students List ({students.length})
+            </Text>
+            <TouchableOpacity
+              onPress={markAllPresent}
+              style={{
+                backgroundColor: "#dcfce7",
+                borderColor: "#bbf7d0",
+                borderWidth: 1,
+                paddingVertical: 6,
+                paddingHorizontal: 12,
+                borderRadius: 8,
+              }}
+            >
+              <Text style={{ fontSize: 13, fontWeight: "700", color: "#16a34a" }}>
+                Mark All Present
+              </Text>
+            </TouchableOpacity>
+          </View>
+
           <FlatList
             data={students}
             keyExtractor={(item) => item.id}

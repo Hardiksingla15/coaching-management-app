@@ -10,17 +10,17 @@ import {
   StyleSheet,
   Modal,
   ScrollView,
+  RefreshControl,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
 import { Picker } from "@react-native-picker/picker";
 
 import ScreenContainer from "../../components/ScreenContainer";
+import AppHeader from "../../components/AppHeader";
 import EmptyState from "../../components/batch/EmptyState";
 import AuthButton from "../../components/AuthButton";
 import { getFees, recordPayment } from "../../firebase/fees";
 import type { FeeRecord, PaymentItem } from "../../types/fees";
-import { formatBatchShort } from "../../services/batchUtils";
 
 // Helper to get local date in YYYY-MM-DD format
 function getLocalDateString() {
@@ -31,14 +31,26 @@ function getLocalDateString() {
   return `${year}-${month}-${day}`;
 }
 
+type StudentGroup = {
+  studentId: string;
+  studentName: string;
+  records: FeeRecord[];
+  totalFee: number;
+  paidAmount: number;
+  remainingAmount: number;
+  hasPending: boolean;
+};
+
 export default function OwnerFeesScreen() {
-  const router = useRouter();
   const [records, setRecords] = useState<FeeRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<"all" | "pending" | "paid">("all");
+  const [selectedClass, setSelectedClass] = useState<string | null>(null);
+  const [expandedStudents, setExpandedStudents] = useState<Record<string, boolean>>({});
 
   // Modal payment state
   const [selectedFee, setSelectedFee] = useState<FeeRecord | null>(null);
@@ -64,6 +76,42 @@ export default function OwnerFeesScreen() {
     loadFeesData();
   }, [loadFeesData]);
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadFeesData();
+    setRefreshing(false);
+  }, [loadFeesData]);
+
+  // Aggregate statistics for 2x2 cards
+  const summary = useMemo(() => {
+    let assigned = 0;
+    let collected = 0;
+    let pending = 0;
+    let paidCount = 0;
+
+    records.forEach((rec) => {
+      assigned += rec.totalFee ?? 0;
+      collected += rec.paidAmount ?? 0;
+      pending += rec.remainingAmount ?? 0;
+      if (rec.status === "paid") {
+        paidCount++;
+      }
+    });
+
+    return {
+      totalAssigned: assigned,
+      totalCollected: collected,
+      totalPending: pending,
+      totalPaidRecords: paidCount,
+    };
+  }, [records]);
+
+  // Extract unique classes from fee records for filter chips
+  const classFilters = useMemo(() => {
+    const classes = records.map((r) => r.classLevel).filter(Boolean);
+    return Array.from(new Set(classes)).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  }, [records]);
+
   // Client-side search and filters
   const filteredRecords = useMemo(() => {
     return records.filter((item) => {
@@ -72,12 +120,52 @@ export default function OwnerFeesScreen() {
         item.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.batch.toLowerCase().includes(searchQuery.toLowerCase());
       
-      const matchesFilter =
+      const matchesStatus =
         filterStatus === "all" || item.status === filterStatus;
 
-      return matchesSearch && matchesFilter;
+      const matchesClass =
+        !selectedClass || item.classLevel === selectedClass;
+
+      return matchesSearch && matchesStatus && matchesClass;
     });
-  }, [records, searchQuery, filterStatus]);
+  }, [records, searchQuery, filterStatus, selectedClass]);
+
+  // Group filtered records student-wise
+  const groupedStudents = useMemo(() => {
+    const groupsMap: Record<string, StudentGroup> = {};
+
+    filteredRecords.forEach((rec) => {
+      if (!groupsMap[rec.studentId]) {
+        groupsMap[rec.studentId] = {
+          studentId: rec.studentId,
+          studentName: rec.studentName,
+          records: [],
+          totalFee: 0,
+          paidAmount: 0,
+          remainingAmount: 0,
+          hasPending: false,
+        };
+      }
+
+      const group = groupsMap[rec.studentId];
+      group.records.push(rec);
+      group.totalFee += rec.totalFee ?? 0;
+      group.paidAmount += rec.paidAmount ?? 0;
+      group.remainingAmount += rec.remainingAmount ?? 0;
+      if (rec.status === "pending") {
+        group.hasPending = true;
+      }
+    });
+
+    return Object.values(groupsMap).sort((a, b) => a.studentName.localeCompare(b.studentName));
+  }, [filteredRecords]);
+
+  const toggleExpand = (studentId: string) => {
+    setExpandedStudents((prev) => ({
+      ...prev,
+      [studentId]: !prev[studentId],
+    }));
+  };
 
   const openPaymentModal = (fee: FeeRecord) => {
     setSelectedFee(fee);
@@ -136,13 +224,128 @@ export default function OwnerFeesScreen() {
     }
   };
 
+  const renderStudentGroup = ({ item }: { item: StudentGroup }) => {
+    const isExpanded = !!expandedStudents[item.studentId];
+
+    return (
+      <View style={styles.groupCard}>
+        {/* Student Group Header */}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => toggleExpand(item.studentId)}
+          style={[styles.groupHeader, isExpanded && styles.groupHeaderActive]}
+        >
+          <View style={{ flex: 1, marginRight: 8 }}>
+            <Text style={styles.studentName}>{item.studentName}</Text>
+            <View style={styles.groupMetaRow}>
+              <Text style={styles.metaText}>Assigned: ₹{item.totalFee}</Text>
+              <Text style={[styles.metaText, styles.greenText]}>Paid: ₹{item.paidAmount}</Text>
+              {item.remainingAmount > 0 && (
+                <Text style={[styles.metaText, styles.redText]}>Pending: ₹{item.remainingAmount}</Text>
+              )}
+            </View>
+          </View>
+
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+            <View
+              style={[
+                styles.statusBadge,
+                !item.hasPending ? styles.paidBadge : styles.pendingBadge,
+                { minWidth: 80, paddingVertical: 4, paddingHorizontal: 8 }
+              ]}
+            >
+              <Text
+                style={[
+                  styles.statusBadgeText,
+                  !item.hasPending ? styles.paidBadgeText : styles.pendingBadgeText,
+                ]}
+              >
+                {!item.hasPending ? "PAID" : "PENDING"}
+              </Text>
+            </View>
+            <Ionicons
+              name={isExpanded ? "chevron-up" : "chevron-down"}
+              size={20}
+              color="#64748b"
+            />
+          </View>
+        </TouchableOpacity>
+
+        {/* Expanded Subject Slots List */}
+        {isExpanded && (
+          <View style={styles.expandedContent}>
+            {item.records.map((rec) => (
+              <View
+                key={rec.id || `${rec.studentId}_${rec.subject}`}
+                style={styles.subjectRow}
+              >
+                <View style={{ flex: 1, marginRight: 8 }}>
+                  <Text style={styles.subjectTitle}>
+                    Class {rec.classLevel} · {rec.subject}
+                  </Text>
+                  <Text style={styles.subjectTiming}>
+                    Timing: {rec.batch}
+                  </Text>
+                  <View style={{ flexDirection: "row", gap: 10, marginTop: 4 }}>
+                    <Text style={styles.subjectMetaText}>Total: ₹{rec.totalFee}</Text>
+                    <Text style={[styles.subjectMetaText, styles.greenText]}>Paid: ₹{rec.paidAmount}</Text>
+                  </View>
+                </View>
+
+                <View style={{ alignItems: "flex-end" }}>
+                  <TouchableOpacity
+                    onPress={() => openPaymentModal(rec)}
+                    style={[
+                      styles.statusBadge,
+                      rec.status === "paid" ? styles.paidBadge : styles.pendingBadge,
+                      { paddingVertical: 6, paddingHorizontal: 10 }
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.statusBadgeText,
+                        rec.status === "paid" ? styles.paidBadgeText : styles.pendingBadgeText,
+                        { fontSize: 11 }
+                      ]}
+                    >
+                      {rec.status === "paid" ? "PAID" : `Collect ₹${rec.remainingAmount}`}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+    );
+  };
+
   return (
     <ScreenContainer>
-      <View style={styles.headerRow}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#0f172a" />
-        </TouchableOpacity>
-        <Text style={styles.title}>Fees Management 💳</Text>
+      <AppHeader title="Fees Management 💳" showBack={true} showLogout={false} />
+
+      {/* Aggregates Summary Dashboard (2x2 Grid) */}
+      <View style={styles.summaryGrid}>
+        <View style={{ flexDirection: "row", gap: 10, marginBottom: 10 }}>
+          <View style={styles.summaryCard}>
+            <Text style={styles.summaryLabel}>Total Assigned</Text>
+            <Text style={styles.summaryValue}>₹{summary.totalAssigned}</Text>
+          </View>
+          <View style={styles.summaryCard}>
+            <Text style={[styles.summaryLabel, styles.greenText]}>Total Collected</Text>
+            <Text style={[styles.summaryValue, styles.greenText]}>₹{summary.totalCollected}</Text>
+          </View>
+        </View>
+        <View style={{ flexDirection: "row", gap: 10 }}>
+          <View style={styles.summaryCard}>
+            <Text style={[styles.summaryLabel, styles.redText]}>Pending Amount</Text>
+            <Text style={[styles.summaryValue, styles.redText]}>₹{summary.totalPending}</Text>
+          </View>
+          <View style={styles.summaryCard}>
+            <Text style={[styles.summaryLabel, styles.blueText]}>Paid Records</Text>
+            <Text style={[styles.summaryValue, styles.blueText]}>{summary.totalPaidRecords}</Text>
+          </View>
+        </View>
       </View>
 
       {/* Search Bar */}
@@ -161,7 +364,7 @@ export default function OwnerFeesScreen() {
         )}
       </View>
 
-      {/* Filter Chips */}
+      {/* Status Filter Chips */}
       <View style={styles.filterContainer}>
         {(["all", "pending", "paid"] as const).map((status) => (
           <TouchableOpacity
@@ -184,63 +387,71 @@ export default function OwnerFeesScreen() {
         ))}
       </View>
 
+      {/* Class Filter Chips */}
+      {classFilters.length > 0 && (
+        <View style={{ marginBottom: 16 }}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 8 }}
+          >
+            <TouchableOpacity
+              onPress={() => setSelectedClass(null)}
+              style={[
+                styles.filterChip,
+                selectedClass === null && styles.filterChipActive,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.filterChipText,
+                  selectedClass === null && styles.filterChipTextActive,
+                ]}
+              >
+                ALL CLASSES
+              </Text>
+            </TouchableOpacity>
+            {classFilters.map((cls) => (
+              <TouchableOpacity
+                key={cls}
+                onPress={() => setSelectedClass(cls)}
+                style={[
+                  styles.filterChip,
+                  selectedClass === cls && styles.filterChipActive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.filterChipText,
+                    selectedClass === cls && styles.filterChipTextActive,
+                  ]}
+                >
+                  CLASS {cls}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#0f172a" />
         </View>
-      ) : filteredRecords.length === 0 ? (
+      ) : groupedStudents.length === 0 ? (
         <EmptyState message="No matching fee invoices found." />
       ) : (
         <FlatList
-          data={filteredRecords}
-          keyExtractor={(item) => item.id || `${item.studentId}_${item.subject}`}
+          data={groupedStudents}
+          keyExtractor={(item) => item.studentId}
           contentContainerStyle={styles.listContainer}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              onPress={() => openPaymentModal(item)}
-              style={styles.feeCard}
-            >
-              <View style={styles.feeInfo}>
-                <Text style={styles.studentName}>{item.studentName}</Text>
-                <Text style={styles.slotDetails}>
-                  Class {item.classLevel} · {formatBatchShort({
-                    classLevel: item.classLevel,
-                    batch: item.batch,
-                    subject: item.subject,
-                  })}
-                </Text>
-                <View style={styles.feeAmounts}>
-                  <Text style={styles.amountText}>Total: ₹{item.totalFee}</Text>
-                  <Text style={[styles.amountText, styles.collectedText]}>
-                    Paid: ₹{item.paidAmount}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.statusCol}>
-                <View
-                  style={[
-                    styles.statusBadge,
-                    item.status === "paid" ? styles.paidBadge : styles.pendingBadge,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.statusBadgeText,
-                      item.status === "paid" ? styles.paidBadgeText : styles.pendingBadgeText,
-                    ]}
-                  >
-                    {item.status === "paid" ? "PAID" : `₹${item.remainingAmount}`}
-                  </Text>
-                </View>
-                {item.status === "pending" && (
-                  <Text style={styles.actionPrompt}>Collect</Text>
-                )}
-              </View>
-            </TouchableOpacity>
-          )}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+          renderItem={renderStudentGroup}
         />
       )}
+
 
       {/* Payment Receipt Modal */}
       {selectedFee && (
@@ -572,6 +783,9 @@ const styles = StyleSheet.create({
   redText: {
     color: "#dc2626",
   },
+  blueText: {
+    color: "#2563eb",
+  },
   paymentForm: {
     backgroundColor: "#f8fafc",
     borderRadius: 12,
@@ -659,5 +873,96 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "bold",
     color: "#16a34a",
+  },
+  summaryGrid: {
+    marginBottom: 16,
+  },
+  summaryCard: {
+    flex: 1,
+    backgroundColor: "#ffffff",
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  summaryLabel: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#64748b",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  summaryValue: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#0f172a",
+    marginTop: 4,
+  },
+  groupCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+    overflow: "hidden",
+  },
+  groupHeader: {
+    padding: 16,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#ffffff",
+  },
+  groupHeaderActive: {
+    backgroundColor: "#f8fafc",
+  },
+  groupMetaRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 4,
+    alignItems: "center",
+  },
+  metaText: {
+    fontSize: 12,
+    color: "#64748b",
+  },
+  expandedContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#f1f5f9",
+    backgroundColor: "#fdfdfd",
+  },
+  subjectRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f1f5f9",
+  },
+  subjectTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#1e293b",
+  },
+  subjectTiming: {
+    fontSize: 12,
+    color: "#64748b",
+    marginTop: 2,
+  },
+  subjectMetaText: {
+    fontSize: 12,
+    color: "#475569",
   },
 });

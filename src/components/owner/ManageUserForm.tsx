@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Alert, Text, View, ActivityIndicator } from "react-native";
+import { Alert, Text, View, ActivityIndicator, ScrollView, TouchableOpacity } from "react-native";
 import { useRouter } from "expo-router";
 
 import MultiBatchAssignment from "../batch/MultiBatchAssignment";
@@ -45,6 +45,7 @@ export default function ManageUserForm({ userId, role }: Props) {
   const { structures, loading: cacheLoading } = useAcademicContext();
   const [originalSubjects, setOriginalSubjects] = useState<AssignedSubject[]>([]);
   const [fees, setFees] = useState<Record<string, number>>({});
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   const roleLabel = role === "student" ? "Student" : "Teacher";
 
@@ -86,11 +87,32 @@ export default function ManageUserForm({ userId, role }: Props) {
       });
   }, [userId, role, roleLabel]);
 
+  const handleNameChange = (val: string) => {
+    setName(val);
+    setSaveSuccess(false);
+  };
+
+  const handleMobileChange = (val: string) => {
+    setMobile(val);
+    setSaveSuccess(false);
+  };
+
+  const handlePasswordChange = (val: string) => {
+    setPassword(val);
+    setSaveSuccess(false);
+  };
+
+  const handleAssignedSubjectsChange = (val: AssignedSubject[]) => {
+    setAssignedSubjects(val);
+    setSaveSuccess(false);
+  };
+
   const handleFeeChange = (slotKey: string, fee: number) => {
     setFees((prev) => ({
       ...prev,
       [slotKey]: fee,
     }));
+    setSaveSuccess(false);
   };
 
   const syncAcademicStructureForTeacher = async (
@@ -155,10 +177,9 @@ export default function ManageUserForm({ userId, role }: Props) {
       return;
     }
 
-
-
     try {
       setLoading(true);
+      setSaveSuccess(false);
 
       if (isEdit && userId) {
         const cleaned = sanitizeAssignedSubjectsForRole(
@@ -203,8 +224,9 @@ export default function ManageUserForm({ userId, role }: Props) {
           await syncStudentTeacherFieldsFromStructure();
         }
 
-        Alert.alert("Success", `${roleLabel} updated`);
-        router.back();
+        setOriginalSubjects([...cleaned]);
+        setSaveSuccess(true);
+        Alert.alert("Success", `${roleLabel} updated successfully`);
         return;
       }
 
@@ -307,70 +329,114 @@ export default function ManageUserForm({ userId, role }: Props) {
 
   return (
     <ScreenContainer>
-      <Text
-        style={{
-          fontSize: 28,
-          fontWeight: "bold",
-          marginBottom: 20,
-        }}
-      >
-        {isEdit ? `Edit ${roleLabel}` : `Create ${roleLabel}`}
-      </Text>
-
-      <CustomInput
-        placeholder="Full Name"
-        value={name}
-        onChangeText={setName}
-      />
-
-      {isEdit ? (
+      <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <Text
           style={{
+            fontSize: 28,
+            fontWeight: "bold",
             marginBottom: 20,
-            padding: 15,
-            backgroundColor: "#f5f5f5",
-            borderRadius: 10,
           }}
         >
-          Mobile: {mobile}
+          {isEdit ? `Edit ${roleLabel}` : `Create ${roleLabel}`}
         </Text>
-      ) : (
+
+        {saveSuccess && (
+          <View
+            style={{
+              backgroundColor: "#e6f7ed",
+              borderColor: "#28a745",
+              borderWidth: 1,
+              borderRadius: 10,
+              padding: 12,
+              marginBottom: 16,
+            }}
+          >
+            <Text style={{ fontWeight: "700", color: "#1e7e34" }}>Changes Saved</Text>
+            <Text style={{ marginTop: 4, color: "#333" }}>
+              {roleLabel} details have been updated successfully.
+            </Text>
+          </View>
+        )}
+
         <CustomInput
-          placeholder="Mobile Number"
-          value={mobile}
-          onChangeText={setMobile}
-          keyboardType="phone-pad"
+          placeholder="Full Name"
+          value={name}
+          onChangeText={handleNameChange}
         />
-      )}
 
-      {!isEdit && (
-        <CustomInput
-          placeholder="Password (min 6 chars)"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
+        {isEdit ? (
+          <Text
+            style={{
+              marginBottom: 20,
+              padding: 15,
+              backgroundColor: "#f5f5f5",
+              borderRadius: 10,
+              color: "#333",
+            }}
+          >
+            Mobile: {mobile}
+          </Text>
+        ) : (
+          <CustomInput
+            placeholder="Mobile Number"
+            value={mobile}
+            onChangeText={handleMobileChange}
+            keyboardType="phone-pad"
+          />
+        )}
+
+        {!isEdit && (
+          <CustomInput
+            placeholder="Password (min 6 chars)"
+            value={password}
+            onChangeText={handlePasswordChange}
+            secureTextEntry
+          />
+        )}
+
+        <View style={{ marginTop: 10 }}>
+          <MultiBatchAssignment
+            structures={structures}
+            value={assignedSubjects}
+            onChange={handleAssignedSubjectsChange}
+            assignmentRole={role}
+            fees={fees}
+            onFeeChange={handleFeeChange}
+          />
+        </View>
+
+        <AuthButton
+          title={loading ? "Saving..." : isEdit ? "Save Changes" : `Create ${roleLabel}`}
+          onPress={handleSave}
         />
-      )}
 
-      <View style={{ marginTop: 10 }}>
-        <MultiBatchAssignment
-          structures={structures}
-          value={assignedSubjects}
-          onChange={setAssignedSubjects}
-          assignmentRole={role}
-          fees={fees}
-          onFeeChange={handleFeeChange}
-        />
-      </View>
+        {isEdit && (
+          <AuthButton title={`Delete ${roleLabel}`} onPress={handleDelete} />
+        )}
 
-      <AuthButton
-        title={loading ? "Saving..." : isEdit ? "Save Changes" : `Create ${roleLabel}`}
-        onPress={handleSave}
-      />
-
-      {isEdit && (
-        <AuthButton title={`Delete ${roleLabel}`} onPress={handleDelete} />
-      )}
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={{
+            backgroundColor: "#e2e8f0",
+            padding: 18,
+            borderRadius: 12,
+            alignItems: "center",
+            marginTop: 10,
+            marginBottom: 20,
+          }}
+        >
+          <Text
+            style={{
+              color: "#475569",
+              fontWeight: "bold",
+              fontSize: 16,
+            }}
+          >
+            Cancel
+          </Text>
+        </TouchableOpacity>
+      </ScrollView>
     </ScreenContainer>
   );
 }
+

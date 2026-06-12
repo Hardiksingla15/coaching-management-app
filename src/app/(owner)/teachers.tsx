@@ -6,14 +6,15 @@ import {
   TouchableOpacity,
   TextInput,
   StyleSheet,
+  RefreshControl,
 } from "react-native";
 import React, { useCallback, useState, useMemo } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
 import ScreenContainer from "../../components/ScreenContainer";
+import AppHeader from "../../components/AppHeader";
 import AuthButton from "../../components/AuthButton";
-import { formatBatchShort } from "../../services/batchUtils";
 import { getAllTeachables } from "../../firebase/firestore";
 import { useAcademicContext } from "../../context/AcademicContext";
 import type { AcademicStructure } from "../../types/academic";
@@ -27,43 +28,117 @@ function getTeachingSlotsForUser(
 }
 
 // Memoized teacher list item card
-const TeacherCard = React.memo(({ item, teachingSlots, onPress }: {
+const TeacherCard = React.memo(function TeacherCard({ item, teachingSlots, onPress }: {
   item: UserProfileWithId;
   teachingSlots: ReturnType<typeof getTeachingSlotsForUser>;
   onPress: () => void;
-}) => {
+}) {
+  const [expanded, setExpanded] = useState(false);
+
   return (
-    <TouchableOpacity
-      onPress={onPress}
+    <View
       style={{
-        backgroundColor: "#f5f5f5",
-        padding: 15,
-        borderRadius: 10,
-        marginBottom: 15,
+        backgroundColor: "#ffffff",
+        padding: 16,
+        borderRadius: 12,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: "#e2e8f0",
+        shadowColor: "#0f172a",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+        elevation: 1,
       }}
     >
-      <Text style={{ fontSize: 18, fontWeight: "bold" }}>{item.name}</Text>
-      <Text style={{ marginTop: 5, color: "gray" }}>{item.mobile}</Text>
-      <Text style={{ marginTop: 10, fontWeight: "600" }}>Teaching slots:</Text>
-      {teachingSlots.length ? (
-        teachingSlots.map((slot) => (
-          <Text key={slot.id}>
-            · Class {slot.classLevel} · {formatBatchShort(slot)}
-          </Text>
-        ))
-      ) : (
-        <Text style={{ color: "gray" }}>Not assigned</Text>
+      {/* Top Header Row: Name & Mobile, plus Edit button */}
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => setExpanded(prev => !prev)}
+          style={{ flex: 1 }}
+        >
+          <Text style={{ fontSize: 18, fontWeight: "bold", color: "#0f172a" }}>{item.name}</Text>
+          <Text style={{ marginTop: 4, color: "#64748b", fontSize: 14 }}>{item.mobile}</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={onPress}
+          style={{
+            backgroundColor: "#f1f5f9",
+            paddingVertical: 6,
+            paddingHorizontal: 12,
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: "#cbd5e1",
+          }}
+        >
+          <Text style={{ fontSize: 12, fontWeight: "700", color: "#475569" }}>Edit</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Slots Section */}
+      <TouchableOpacity
+        activeOpacity={0.7}
+        onPress={() => setExpanded(prev => !prev)}
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginTop: 12,
+          paddingTop: 12,
+          borderTopWidth: 1,
+          borderTopColor: "#f1f5f9",
+        }}
+      >
+        <Text style={{ fontWeight: "600", fontSize: 13, color: "#475569" }}>
+          {teachingSlots.length} assigned slot{teachingSlots.length === 1 ? "" : "s"}
+        </Text>
+        {teachingSlots.length > 0 && (
+          <Ionicons
+            name={expanded ? "chevron-up" : "chevron-down"}
+            size={16}
+            color="#64748b"
+          />
+        )}
+      </TouchableOpacity>
+
+      {expanded && teachingSlots.length > 0 && (
+        <View style={{ gap: 6, marginTop: 10, paddingLeft: 8 }}>
+          {teachingSlots.map((slot) => (
+            <View
+              key={slot.id}
+              style={{
+                backgroundColor: "#f0fdf4",
+                borderColor: "#bbf7d0",
+                borderWidth: 1,
+                borderRadius: 8,
+                paddingVertical: 6,
+                paddingHorizontal: 10,
+              }}
+            >
+              <Text style={{ fontSize: 13, fontWeight: "600", color: "#166534" }}>
+                Class {slot.classLevel} · {slot.subject}
+              </Text>
+              <Text style={{ fontSize: 11, color: "#15803d", marginTop: 2 }}>
+                Timing: {slot.batch}
+              </Text>
+            </View>
+          ))}
+        </View>
       )}
-    </TouchableOpacity>
+    </View>
   );
 });
+TeacherCard.displayName = "TeacherCard";
 
 export default function OwnerTeachersScreen() {
   const router = useRouter();
   const [teachers, setTeachers] = useState<UserProfileWithId[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const { structures, loading: cacheLoading } = useAcademicContext();
+  const { structures, loading: cacheLoading, refresh } = useAcademicContext();
 
   const fetchTeachers = async () => {
     try {
@@ -82,6 +157,12 @@ export default function OwnerTeachersScreen() {
       fetchTeachers();
     }, [])
   );
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await Promise.all([fetchTeachers(), refresh()]);
+    setRefreshing(false);
+  }, [refresh]);
 
   const filteredTeachers = useMemo(() => {
     return teachers.filter((item) => {
@@ -117,15 +198,7 @@ export default function OwnerTeachersScreen() {
 
   return (
     <ScreenContainer>
-      <Text
-        style={{
-          fontSize: 28,
-          fontWeight: "bold",
-          marginBottom: 12,
-        }}
-      >
-        Teachers (Owner included) 👨‍🏫
-      </Text>
+      <AppHeader title="Teachers 👨‍🏫" showLogout={false} />
 
       <AuthButton
         title="Create Teacher"
@@ -157,6 +230,9 @@ export default function OwnerTeachersScreen() {
         data={teachersWithSlots}
         keyExtractor={({ item }) => item.id}
         style={{ marginTop: 16 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
         renderItem={({ item: { item, teachingSlots } }) => (
           <TeacherCard
             item={item}
@@ -195,4 +271,5 @@ const styles = StyleSheet.create({
     color: "#0f172a",
   },
 });
+
 
