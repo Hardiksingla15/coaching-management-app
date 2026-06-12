@@ -18,9 +18,9 @@ import CustomInput from "../../components/CustomInput";
 import AuthButton from "../../components/AuthButton";
 import {
   addAcademicStructure,
-  getAcademicStructures,
   updateAcademicStructure,
 } from "../../firebase/academic";
+import { useAcademicContext } from "../../context/AcademicContext";
 import { getAllTeachables } from "../../firebase/firestore";
 import {
   deleteSubjectSlotEverywhere,
@@ -60,8 +60,8 @@ export default function ManageBatches() {
   const [teacherId, setTeacherId] = useState("");
   const [editingSlotId, setEditingSlotId] = useState<string | null>(null);
   const [originalSlot, setOriginalSlot] = useState<SubjectSlot | null>(null);
-  const [structures, setStructures] = useState<AcademicStructure[]>([]);
   const [teachers, setTeachers] = useState<UserProfileWithId[]>([]);
+  const { structures, loading: cacheLoading, refresh } = useAcademicContext();
   const [busy, setBusy] = useState(false);
   const [listLoading, setListLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<StatusMessage | null>(null);
@@ -76,16 +76,12 @@ export default function ManageBatches() {
   const fetchStructures = async () => {
     setListLoading(true);
     try {
-      const [data, teachables] = await Promise.all([
-        getAcademicStructures(),
-        getAllTeachables(),
-      ]);
-      setStructures(data);
+      const teachables = await getAllTeachables();
       setTeachers(teachables as UserProfileWithId[]);
     } catch (error) {
       Alert.alert(
         "Load failed",
-        `Could not refresh subject slots.\n\n${getErrorMessage(error)}`
+        `Could not refresh teachable list.\n\n${getErrorMessage(error)}`
       );
     } finally {
       setListLoading(false);
@@ -172,6 +168,7 @@ export default function ManageBatches() {
           newSlot,
           updatedStructure
         );
+        await refresh();
 
         resetForm();
         resultTitle = "Updated successfully";
@@ -193,6 +190,7 @@ export default function ManageBatches() {
           assignedTeacherId: teacherId || "",
           assignedTeacherName: selectedTeacher?.name || "",
         });
+        await refresh();
 
         resetForm();
         resultTitle = "Added successfully";
@@ -266,6 +264,7 @@ export default function ManageBatches() {
 
     try {
       await deleteSubjectSlotEverywhere(slot);
+      await refresh();
 
       if (editingSlotId === slot.id) {
         resetForm();
@@ -511,7 +510,7 @@ export default function ManageBatches() {
           )}
         </View>
 
-        {listLoading ? (
+        {listLoading || cacheLoading ? (
           <ActivityIndicator style={{ marginTop: 16 }} size="large" />
         ) : null}
 

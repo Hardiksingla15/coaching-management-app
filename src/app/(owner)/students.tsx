@@ -7,16 +7,16 @@ import {
   TextInput,
   StyleSheet,
 } from "react-native";
-import { useCallback, useState, useMemo } from "react";
+import React, { useCallback, useState, useMemo } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
 import ScreenContainer from "../../components/ScreenContainer";
 import AuthButton from "../../components/AuthButton";
 import { formatBatchShort, getSubjectSlotKey } from "../../services/batchUtils";
-import { getAcademicStructures } from "../../firebase/academic";
 import { getAllStudents } from "../../firebase/firestore";
 import { toStudentSlot } from "../../services/subjectSlotSync";
+import { useAcademicContext } from "../../context/AcademicContext";
 import type { AcademicStructure } from "../../types/academic";
 import type { AssignedSubject, UserProfileWithId } from "../../types/user";
 
@@ -34,21 +34,50 @@ function enrichStudentSlots(
   });
 }
 
+// Memoized student list item card
+const StudentCard = React.memo(({ item, slots, onPress }: {
+  item: UserProfileWithId;
+  slots: ReturnType<typeof enrichStudentSlots>;
+  onPress: () => void;
+}) => {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      style={{
+        backgroundColor: "#f5f5f5",
+        padding: 15,
+        borderRadius: 10,
+        marginBottom: 15,
+      }}
+    >
+      <Text style={{ fontSize: 18, fontWeight: "bold" }}>{item.name}</Text>
+      <Text style={{ marginTop: 5, color: "gray" }}>{item.mobile}</Text>
+      <Text style={{ marginTop: 10, fontWeight: "600" }}>Subject slots:</Text>
+      {slots.length ? (
+        slots.map((batch) => (
+          <Text key={`${batch.classLevel}-${batch.batch}-${batch.subject}`}>
+            · {formatBatchShort(batch)}
+            {batch.teacherName ? ` · ${batch.teacherName}` : ""}
+          </Text>
+        ))
+      ) : (
+        <Text style={{ color: "gray" }}>Not assigned</Text>
+      )}
+    </TouchableOpacity>
+  );
+});
+
 export default function OwnerStudentsScreen() {
   const router = useRouter();
   const [students, setStudents] = useState<UserProfileWithId[]>([]);
-  const [structures, setStructures] = useState<AcademicStructure[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const { structures, loading: cacheLoading } = useAcademicContext();
 
   const fetchStudents = async () => {
     try {
-      const [data, academicStructures] = await Promise.all([
-        getAllStudents(),
-        getAcademicStructures(),
-      ]);
+      const data = await getAllStudents();
       setStudents(data as UserProfileWithId[]);
-      setStructures(academicStructures);
     } catch {
       console.log("Failed to fetch students");
     } finally {
@@ -73,7 +102,15 @@ export default function OwnerStudentsScreen() {
     });
   }, [students, searchQuery]);
 
-  if (loading) {
+  // Precompute slots to avoid calculating them inside renderItem
+  const studentsWithSlots = useMemo(() => {
+    return filteredStudents.map((item) => ({
+      item,
+      slots: enrichStudentSlots(item.assignedSubjects, structures),
+    }));
+  }, [filteredStudents, structures]);
+
+  if (loading || cacheLoading) {
     return (
       <View
         style={{
@@ -126,43 +163,21 @@ export default function OwnerStudentsScreen() {
       </View>
 
       <FlatList
-        data={filteredStudents}
-        keyExtractor={(item) => item.id}
+        data={studentsWithSlots}
+        keyExtractor={({ item }) => item.id}
         style={{ marginTop: 16 }}
-        renderItem={({ item }) => {
-          const slots = enrichStudentSlots(item.assignedSubjects, structures);
-
-          return (
-            <TouchableOpacity
-              onPress={() =>
-                router.push({
-                  pathname: "/(owner)/manage-student" as never,
-                  params: { id: item.id },
-                })
-              }
-              style={{
-                backgroundColor: "#f5f5f5",
-                padding: 15,
-                borderRadius: 10,
-                marginBottom: 15,
-              }}
-            >
-              <Text style={{ fontSize: 18, fontWeight: "bold" }}>{item.name}</Text>
-              <Text style={{ marginTop: 5, color: "gray" }}>{item.mobile}</Text>
-              <Text style={{ marginTop: 10, fontWeight: "600" }}>Subject slots:</Text>
-              {slots.length ? (
-                slots.map((batch) => (
-                  <Text key={`${batch.classLevel}-${batch.batch}-${batch.subject}`}>
-                    · {formatBatchShort(batch)}
-                    {batch.teacherName ? ` · ${batch.teacherName}` : ""}
-                  </Text>
-                ))
-              ) : (
-                <Text style={{ color: "gray" }}>Not assigned</Text>
-              )}
-            </TouchableOpacity>
-          );
-        }}
+        renderItem={({ item: { item, slots } }) => (
+          <StudentCard
+            item={item}
+            slots={slots}
+            onPress={() =>
+              router.push({
+                pathname: "/(owner)/manage-student" as never,
+                params: { id: item.id },
+              })
+            }
+          />
+        )}
       />
     </ScreenContainer>
   );

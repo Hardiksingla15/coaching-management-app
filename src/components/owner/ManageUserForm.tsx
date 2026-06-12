@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Alert, Text, View } from "react-native";
+import { Alert, Text, View, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
 
 import MultiBatchAssignment from "../batch/MultiBatchAssignment";
@@ -13,7 +13,8 @@ import {
   saveUserData,
   updateUserData,
 } from "../../firebase/firestore";
-import { getAcademicStructures, updateAcademicStructure } from "../../firebase/academic";
+import { updateAcademicStructure } from "../../firebase/academic";
+import { useAcademicContext } from "../../context/AcademicContext";
 import {
   syncAllTeachableSlotsFromStructure,
   syncStudentTeacherFieldsFromStructure,
@@ -39,52 +40,51 @@ export default function ManageUserForm({ userId, role }: Props) {
   const [mobile, setMobile] = useState("");
   const [password, setPassword] = useState("");
   const [assignedSubjects, setAssignedSubjects] = useState<AssignedSubject[]>([]);
-  const [structures, setStructures] = useState<AcademicStructure[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingData, setLoadingData] = useState(false);
+  const { structures, loading: cacheLoading } = useAcademicContext();
   const [originalSubjects, setOriginalSubjects] = useState<AssignedSubject[]>([]);
   const [fees, setFees] = useState<Record<string, number>>({});
 
   const roleLabel = role === "student" ? "Student" : "Teacher";
 
   useEffect(() => {
-    getAcademicStructures()
-      .then(setStructures)
-      .catch(() => {
-        Alert.alert("Error", "Failed to load academic structures");
-      });
-  }, []);
-
-  useEffect(() => {
     if (!userId) {
       return;
     }
 
-    getUserData(userId)
-      .then((data) => {
-        if (!data) {
+    setLoadingData(true);
+
+    const fetchUserData = getUserData(userId);
+    const fetchFeesData = role === "student" ? getStudentFees(userId) : Promise.resolve([]);
+
+    Promise.all([fetchUserData, fetchFeesData])
+      .then(([userData, feeRecords]) => {
+        if (!userData) {
           return;
         }
 
-        setName(data.name);
-        setMobile(data.mobile);
-        const subjects = data.assignedSubjects ?? [];
+        setName(userData.name);
+        setMobile(userData.mobile);
+        const subjects = userData.assignedSubjects ?? [];
         setAssignedSubjects([...subjects]);
         setOriginalSubjects([...subjects]);
 
-        if (role === "student") {
-          getStudentFees(userId).then((feeRecords) => {
-            const feeMap: Record<string, number> = {};
-            feeRecords.forEach((rec) => {
-              feeMap[getSubjectSlotKey(rec)] = rec.totalFee;
-            });
-            setFees(feeMap);
+        if (role === "student" && feeRecords) {
+          const feeMap: Record<string, number> = {};
+          feeRecords.forEach((rec) => {
+            feeMap[getSubjectSlotKey(rec)] = rec.totalFee;
           });
+          setFees(feeMap);
         }
       })
       .catch(() => {
         Alert.alert("Error", `Failed to load ${roleLabel.toLowerCase()}`);
+      })
+      .finally(() => {
+        setLoadingData(false);
       });
-  }, [userId, roleLabel]);
+  }, [userId, role, roleLabel]);
 
   const handleFeeChange = (slotKey: string, fee: number) => {
     setFees((prev) => ({
@@ -296,6 +296,14 @@ export default function ManageUserForm({ userId, role }: Props) {
       ]
     );
   };
+
+  if (loadingData || cacheLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
 
   return (
     <ScreenContainer>

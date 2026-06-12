@@ -7,15 +7,15 @@ import {
   TextInput,
   StyleSheet,
 } from "react-native";
-import { useCallback, useState, useMemo } from "react";
+import React, { useCallback, useState, useMemo } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
 import ScreenContainer from "../../components/ScreenContainer";
 import AuthButton from "../../components/AuthButton";
 import { formatBatchShort } from "../../services/batchUtils";
-import { getAcademicStructures } from "../../firebase/academic";
 import { getAllTeachables } from "../../firebase/firestore";
+import { useAcademicContext } from "../../context/AcademicContext";
 import type { AcademicStructure } from "../../types/academic";
 import type { UserProfileWithId } from "../../types/user";
 
@@ -26,21 +26,49 @@ function getTeachingSlotsForUser(
   return structures.filter((slot) => slot.assignedTeacherId === userId);
 }
 
+// Memoized teacher list item card
+const TeacherCard = React.memo(({ item, teachingSlots, onPress }: {
+  item: UserProfileWithId;
+  teachingSlots: ReturnType<typeof getTeachingSlotsForUser>;
+  onPress: () => void;
+}) => {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      style={{
+        backgroundColor: "#f5f5f5",
+        padding: 15,
+        borderRadius: 10,
+        marginBottom: 15,
+      }}
+    >
+      <Text style={{ fontSize: 18, fontWeight: "bold" }}>{item.name}</Text>
+      <Text style={{ marginTop: 5, color: "gray" }}>{item.mobile}</Text>
+      <Text style={{ marginTop: 10, fontWeight: "600" }}>Teaching slots:</Text>
+      {teachingSlots.length ? (
+        teachingSlots.map((slot) => (
+          <Text key={slot.id}>
+            · Class {slot.classLevel} · {formatBatchShort(slot)}
+          </Text>
+        ))
+      ) : (
+        <Text style={{ color: "gray" }}>Not assigned</Text>
+      )}
+    </TouchableOpacity>
+  );
+});
+
 export default function OwnerTeachersScreen() {
   const router = useRouter();
   const [teachers, setTeachers] = useState<UserProfileWithId[]>([]);
-  const [structures, setStructures] = useState<AcademicStructure[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const { structures, loading: cacheLoading } = useAcademicContext();
 
   const fetchTeachers = async () => {
     try {
-      const [teachables, academicStructures] = await Promise.all([
-        getAllTeachables(),
-        getAcademicStructures(),
-      ]);
+      const teachables = await getAllTeachables();
       setTeachers(teachables as UserProfileWithId[]);
-      setStructures(academicStructures);
     } catch {
       console.log("Failed to fetch teachers");
     } finally {
@@ -65,7 +93,15 @@ export default function OwnerTeachersScreen() {
     });
   }, [teachers, searchQuery]);
 
-  if (loading) {
+  // Precompute slots to avoid calculating them inside renderItem
+  const teachersWithSlots = useMemo(() => {
+    return filteredTeachers.map((item) => ({
+      item,
+      teachingSlots: getTeachingSlotsForUser(item.id, structures),
+    }));
+  }, [filteredTeachers, structures]);
+
+  if (loading || cacheLoading) {
     return (
       <View
         style={{
@@ -118,42 +154,21 @@ export default function OwnerTeachersScreen() {
       </View>
 
       <FlatList
-        data={filteredTeachers}
-        keyExtractor={(item) => item.id}
+        data={teachersWithSlots}
+        keyExtractor={({ item }) => item.id}
         style={{ marginTop: 16 }}
-        renderItem={({ item }) => {
-          const teachingSlots = getTeachingSlotsForUser(item.id, structures);
-
-          return (
-            <TouchableOpacity
-              onPress={() =>
-                router.push({
-                  pathname: "/(owner)/manage-teacher" as never,
-                  params: { id: item.id },
-                })
-              }
-              style={{
-                backgroundColor: "#f5f5f5",
-                padding: 15,
-                borderRadius: 10,
-                marginBottom: 15,
-              }}
-            >
-              <Text style={{ fontSize: 18, fontWeight: "bold" }}>{item.name}</Text>
-              <Text style={{ marginTop: 5, color: "gray" }}>{item.mobile}</Text>
-              <Text style={{ marginTop: 10, fontWeight: "600" }}>Teaching slots:</Text>
-              {teachingSlots.length ? (
-                teachingSlots.map((slot) => (
-                  <Text key={slot.id}>
-                    · Class {slot.classLevel} · {formatBatchShort(slot)}
-                  </Text>
-                ))
-              ) : (
-                <Text style={{ color: "gray" }}>Not assigned</Text>
-              )}
-            </TouchableOpacity>
-          );
-        }}
+        renderItem={({ item: { item, teachingSlots } }) => (
+          <TeacherCard
+            item={item}
+            teachingSlots={teachingSlots}
+            onPress={() =>
+              router.push({
+                pathname: "/(owner)/manage-teacher" as never,
+                params: { id: item.id },
+              })
+            }
+          />
+        )}
       />
     </ScreenContainer>
   );

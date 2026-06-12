@@ -24,7 +24,6 @@ export default function OwnerDashboard() {
   const [stats, setStats] = useState<InstituteStats>({
     totalStudents: 0,
     totalTeachers: 0,
-    pendingFees: 0,
   });
   const [feeSummary, setFeeSummary] = useState<FeesSummaryStats>({
     totalAssigned: 0,
@@ -34,8 +33,13 @@ export default function OwnerDashboard() {
   });
 
   useEffect(() => {
-    getInstituteStats().then(setStats).catch(() => {});
-    getFeesSummary().then(setFeeSummary).catch(() => {});
+    Promise.all([
+      getInstituteStats(),
+      getFeesSummary()
+    ]).then(([statsData, feeSummaryData]) => {
+      setStats(statsData);
+      setFeeSummary(feeSummaryData);
+    }).catch(() => {});
   }, []);
 
   return (

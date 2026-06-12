@@ -9,6 +9,7 @@ import {
   getDocs,
   updateDoc,
   deleteField,
+  getCountFromServer,
 } from "firebase/firestore";
 
 import { app } from "./config";
@@ -154,21 +155,21 @@ export const deleteUserProfile = async (id: string) => {
 export type InstituteStats = {
   totalStudents: number;
   totalTeachers: number;
-  pendingFees: number;
 };
 
 export const getInstituteStats = async (): Promise<InstituteStats> => {
-  const { getPendingFeesCount } = await import("./fees");
+  const studentsQuery = query(collection(db, "users"), where("role", "==", "student"));
+  const teachersQuery = query(collection(db, "users"), where("role", "==", "teacher"));
+  const ownersQuery = query(collection(db, "users"), where("role", "==", "owner"));
 
-  const [students, teachables, pendingFees] = await Promise.all([
-    getAllStudents(),
-    getAllTeachables(),
-    getPendingFeesCount().catch(() => 0),
+  const [studentsSnap, teachersSnap, ownersSnap] = await Promise.all([
+    getCountFromServer(studentsQuery),
+    getCountFromServer(teachersQuery),
+    getCountFromServer(ownersQuery),
   ]);
 
   return {
-    totalStudents: students.length,
-    totalTeachers: teachables.length,
-    pendingFees,
+    totalStudents: studentsSnap.data().count,
+    totalTeachers: teachersSnap.data().count + ownersSnap.data().count,
   };
 };
